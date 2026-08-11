@@ -1,0 +1,10 @@
+{
+  "device": "WaterSensors",
+  "status": "ok",
+  "wifi_connected": true,
+  "ph_i2c_detected": true,
+  "ec_i2c_detected": true,
+  "ip": "192.168.1.100",
+  "wifi_rssi_dbm": -33,
+  "uptime_ms": 78974176
+}

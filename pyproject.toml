@@ -1,0 +1,17 @@
+[project]
+name = "Leafy-AI"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.141.1",
+    "pydantic>=2.13.4",
+    "uvicorn>=0.52.1",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+indent-style = "tab"
