@@ -58,7 +58,31 @@ async def control_fan(on: bool) -> str:
 	return "Fan turned " + ("on" if on else "off")
 
 
-# TODO: more tools
+@ai.tool
+async def control_light(on: bool) -> str:
+	"""
+	Turn the light on or off.
+	"""
+	# TODO: This is a mock response for turning the fan on or off.
+	return "Light turned " + ("on" if on else "off")
+
+
+@ai.tool
+async def control_ec_doser(on: bool) -> str:
+	"""
+	Turn the electronic conductivity on or off.
+	"""
+	# TODO: This is a mock response for turning the ec doser on or off.
+	return "EC doser turned " + ("on" if on else "off")
+
+
+@ai.tool
+async def control_ph_doser(on: bool) -> str:
+	"""
+	Turn the pH doser on or off.
+	"""
+	# TODO: This is a mock response for turning the pH doser on or off.
+	return "pH doser turned " + ("on" if on else "off")
 
 
 class ChatRequest(BaseModel):
@@ -83,6 +107,9 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 			get_sensor_data,
 			control_irrigation_pump,
 			control_fan,
+			control_light,
+			control_ec_doser,
+			control_ph_doser,
 		]
 	)
 
