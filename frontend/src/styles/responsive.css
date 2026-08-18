@@ -1,0 +1,438 @@
+@media (max-width: 1080px) {
+  .sidebar {
+    width: 210px;
+  }
+
+  main {
+    margin-left: 210px;
+  }
+
+  .topbar,
+  .dashboard {
+    padding-right: 22px;
+    padding-left: 22px;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-card:nth-child(3) {
+    border-left: 0;
+  }
+
+  .metric-card:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ec-dose-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ec-live-panel {
+    border-top: 1px solid #d8ddd7;
+    border-left: 0;
+  }
+
+  .monitoring-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-feed {
+    min-height: 390px;
+  }
+
+  .side-stack {
+    grid-template-columns: 1.1fr 1fr;
+  }
+
+  .next-event {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --anchor-offset: 86px;
+  }
+
+  .sidebar {
+    width: 228px;
+    transform: translateX(-105%);
+    transition: transform .25s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    display: block;
+    border: 0;
+    background: #15221c80;
+    backdrop-filter: blur(2px);
+  }
+
+  main {
+    margin-left: 0;
+  }
+
+  .mobile-menu {
+    display: flex;
+  }
+
+  .breadcrumb,
+  .sync-status,
+  .top-profile strong,
+  .top-profile svg {
+    display: none;
+  }
+
+  .topbar {
+    height: 62px;
+    padding: 0 15px;
+  }
+
+  .top-actions {
+    margin-left: auto;
+  }
+
+  .dashboard {
+    padding: 24px 15px 40px;
+  }
+
+  .monitoring-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .camera-feed {
+    min-height: 330px;
+  }
+
+  .alerts-panel {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .alert-risk {
+    border-top: 1px solid #efd9d5;
+    border-left: 0;
+    padding-top: 13px;
+    padding-left: 51px;
+  }
+
+  .alert-actions {
+    align-items: center;
+    flex-direction: row;
+    padding-left: 51px;
+  }
+
+  .schedule-response {
+    grid-template-columns: auto 1fr;
+  }
+
+  .response-steps {
+    grid-column: 1 / -1;
+  }
+
+  .welcome {
+    align-items: flex-start;
+  }
+
+  .welcome h1 {
+    font-size: 28px;
+  }
+
+  .date-button {
+    width: 38px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .date-button svg:last-child {
+    display: none;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-card {
+    padding: 16px;
+  }
+
+  .metric-card strong {
+    font-size: 20px;
+  }
+
+  .metric-card small {
+    white-space: normal;
+  }
+
+  .control-row {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .power-control {
+    grid-column: 3;
+  }
+
+  .slider-wrap {
+    grid-column: 2 / 3;
+  }
+
+  .stepper {
+    grid-column: 3;
+  }
+
+  .side-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .ec-dose-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .next-event {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 500px) {
+  .welcome {
+    min-height: 158px;
+    margin-bottom: 20px;
+    padding: 22px 19px;
+  }
+
+  .welcome div > p:last-child {
+    max-width: 270px;
+    line-height: 1.5;
+  }
+
+  .monitoring-heading h2 {
+    font-size: 24px;
+  }
+
+  .monitor-range-tabs {
+    width: 100%;
+  }
+
+  .monitor-range-tabs button {
+    flex: 1;
+  }
+
+  .camera-panel,
+  .trend-panel {
+    padding: 15px;
+  }
+
+  .camera-feed {
+    min-height: 265px;
+  }
+
+  .camera-caption {
+    align-items: flex-end;
+  }
+
+  .camera-caption > span {
+    font-size: 0;
+  }
+
+  .camera-caption > span svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .camera-footer {
+    flex-wrap: wrap;
+  }
+
+  .camera-footer button {
+    width: 100%;
+    margin-left: 0;
+    padding-top: 4px;
+  }
+
+  .trend-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .selected-snapshot {
+    width: 100%;
+    text-align: left;
+  }
+
+  .trend-key {
+    flex-wrap: wrap;
+  }
+
+  .trend-key small {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .trend-row {
+    grid-template-columns: 140px minmax(0, 1fr);
+    gap: 8px;
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .trend-label {
+    grid-template-columns: auto 1fr;
+    gap: 6px;
+  }
+
+  .trend-label > i {
+    grid-row: 1 / 3;
+  }
+
+  .trend-label strong {
+    grid-column: 2;
+    font-size: 11px;
+  }
+
+  .shared-time-axis {
+    margin-left: 155px;
+  }
+
+  .trend-alert-note {
+    grid-template-columns: auto 1fr;
+  }
+
+  .trend-alert-note a {
+    grid-column: 2;
+  }
+
+  .alerts-panel {
+    padding: 15px;
+  }
+
+  .alert-risk,
+  .alert-actions {
+    padding-left: 0;
+  }
+
+  .alert-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .alert-actions a,
+  .alert-actions button {
+    width: 100%;
+  }
+
+  .schedule-policy {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-policy > div + div {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .schedule-response {
+    padding: 15px;
+  }
+
+  .response-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .health-summary {
+    padding: 13px;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card + .metric-card,
+  .metric-card:nth-child(3) {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .schedule-header,
+  .control-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .control-intro {
+    display: flex;
+  }
+
+  .control-intro .outline-button {
+    width: 100%;
+  }
+
+  .control-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .power-control {
+    display: flex;
+    grid-column: 1 / 3;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 9px;
+    padding: 10px 12px;
+    background: #f7f8f6;
+  }
+
+  .power-control > span {
+    margin-bottom: 0;
+  }
+
+  .stepper {
+    grid-column: 1 / 3;
+    width: 100%;
+  }
+
+  .slider-wrap {
+    grid-column: 1 / 3;
+  }
+
+  .manual-actions {
+    flex-wrap: wrap;
+  }
+
+  .ec-settings,
+  .ec-live-panel {
+    padding: 18px 15px;
+  }
+
+  .ec-setting-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .ec-stepper {
+    width: 100%;
+  }
+
+  .save-note {
+    width: 100%;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

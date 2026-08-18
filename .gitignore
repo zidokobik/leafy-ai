@@ -9,4 +9,12 @@ wheels/
 # Virtual environments
 .venv
 
+# Ruff cache
 .ruff_cache
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+
+# Env files
+*.env
