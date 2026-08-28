@@ -5,7 +5,7 @@ import backend.router.controller
 import backend.router.water_sensor
 import backend.settings
 
-settings = backend.config.Settings()
+settings = backend.settings.Settings()
 app = FastAPI(root_path="/api")
 
 app.include_router(backend.router.water_sensor.router)
