@@ -10,11 +10,13 @@ A responsive React dashboard for monitoring and safely operating a Sweet basil g
 - `npm run build` — type-check and create a production build
 - `npm run preview` — serve the production build locally
 
-## Backend connection
+## Environment setup
 
-Copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` when the backend is available. Leaving it empty keeps the current demo-data behavior.
+Copy `.env.example` to `.env.local`. Set `VITE_API_BASE_URL=/` to send API requests through the Vite development proxy, and provide `VITE_SUPABASE_URL` plus `VITE_SUPABASE_PUBLISHABLE_KEY` for Supabase Auth.
 
-The typed REST client lives under `src/api/`. See [docs/backend-api.md](docs/backend-api.md) for the endpoint list, request bodies, response schemas, units, and example payloads.
+Only the browser-safe Supabase publishable key belongs in `frontend/.env.local`. Keep the Supabase secret key in the backend root `.env`.
+
+The typed REST client lives under `src/api/`. See [the Leafy API v1 specification](../docs/api-v1.md) for the endpoint conventions and current implementation status.
 
 ## Source structure
 
