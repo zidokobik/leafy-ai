@@ -1,0 +1,31 @@
+name: "Test"
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9
+
+      - name: Set up environment
+        run: uv sync
+
+      - name: Create .env
+        run: |
+          cat > .env <<EOF
+          ENVIRONMENT=development
+          AI_GATEWAY_API_KEY=
+          AI_MODEL=openai/gpt-5-nano
+          EOF
+
+      - name: Run backend tests
+        run: uv run pytest
