@@ -83,6 +83,11 @@ Any API requests made by the frontend (e.g., `fetch('/api/some-endpoint')`) will
 
 In a production environment, the frontend will be built into static files and served by the backend (FastAPI). In development, however, the frontend and backend are run as separate servers to allow for live reloading of both the frontend and backend code.
 
+# Testing
+1. Run the tests for the backend:
+```bash
+uv run pytest
+```
 
 # Production Deployment
 ### 1. Build the frontend:

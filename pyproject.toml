@@ -16,3 +16,10 @@ line-length = 120
 
 [tool.ruff.format]
 indent-style = "tab"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
