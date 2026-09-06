@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import leafyLogo from '../assets/Leafy_AI_logo.png'
 import { Icon } from './Icon'
 
 type AppSidebarProps = {
@@ -47,8 +48,7 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
     <>
       <aside className={open ? 'sidebar open' : 'sidebar'}>
         <div className="brand">
-          <span className="brand-mark"><Icon name="leaf" size={21} /></span>
-          <span>Leafy<span className="brand-dot">.</span></span>
+          <img className="brand-logo" src={leafyLogo} alt="Leafy AI" />
         </div>
 
         <div className="site-switcher">

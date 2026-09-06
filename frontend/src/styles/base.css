@@ -45,25 +45,13 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
   padding: 0 10px 25px;
-  font: 700 24px 'Manrope', sans-serif;
-  letter-spacing: -.8px;
 }
 
-.brand-mark {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 11px;
-  color: #fff;
-  background: #b97d3f;
-  box-shadow: 0 8px 20px #237a5730;
-}
-
-.brand-dot {
-  color: #4aa67d;
+.brand-logo {
+  display: block;
+  width: 158px;
+  height: auto;
 }
 
 .site-switcher {

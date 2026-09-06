@@ -7,18 +7,7 @@
 }
 
 .brand {
-  color: #fffaf0;
-  font-size: 26px;
-}
-
-.brand-mark {
-  color: #fff;
-  background: #d29542;
-  box-shadow: 0 9px 24px #060f0d50;
-}
-
-.brand-dot {
-  color: #edbb6f;
+  min-height: 64px;
 }
 
 .site-switcher {

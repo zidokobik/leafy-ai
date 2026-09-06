@@ -1,3 +1,4 @@
+import leafyLogo from '../../assets/Leafy_AI_logo.png'
 import { Icon } from '../../components/Icon'
 import type { UserRole } from '../../types/dashboard'
 import './LoginPage.css'
@@ -33,7 +34,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   return (
     <main className="login-shell">
       <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-brand"><span><Icon name="leaf" size={22} /></span>Leafy.</div>
+        <div className="login-brand">
+          <img src={leafyLogo} alt="Leafy AI" />
+        </div>
         <div className="login-copy">
           <span className="login-kicker"><Icon name="lock" size={14} />Protected greenhouse access</span>
           <h1 id="login-title">Choose a demo access level</h1>
@@ -68,7 +71,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       </section>
 
       <aside className="login-visual" aria-label="Leafy greenhouse operations">
-        <div className="login-visual-mark"><Icon name="leaf" size={42} /></div>
+        <div className="login-visual-mark">
+          <img src={leafyLogo} alt="Leafy AI" />
+        </div>
         <div>
           <span>Northside Farm</span>
           <h2>One view for every growing decision.</h2>
