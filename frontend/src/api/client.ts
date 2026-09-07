@@ -1,4 +1,5 @@
 import { apiConfig } from './config'
+import { supabase } from '../Supabase'
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
@@ -25,21 +26,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const controller = new AbortController()
   const abortFromCaller = () => controller.abort()
   options.signal?.addEventListener('abort', abortFromCaller, { once: true })
+  if (options.signal?.aborted) controller.abort()
   const timeout = window.setTimeout(
     () => controller.abort(),
     options.timeoutMs ?? apiConfig.requestTimeoutMs,
   )
 
   try {
+    const headers = new Headers(options.headers)
+    if (!headers.has('Authorization')) {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) throw error
+      if (data.session) headers.set('Authorization', `Bearer ${data.session.access_token}`)
+    }
+    headers.set('Accept', 'application/json')
+    if (options.body !== undefined) headers.set('Content-Type', 'application/json')
     const response = await fetch(`${apiConfig.baseUrl}${path}`, {
       ...options,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       credentials: options.credentials ?? 'include',
-      headers: {
-        Accept: 'application/json',
-        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        ...options.headers,
-      },
+      headers,
       signal: controller.signal,
     })
 

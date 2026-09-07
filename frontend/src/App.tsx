@@ -5,6 +5,8 @@ import { AppSidebar } from './components/AppSidebar'
 import { Topbar } from './components/Topbar'
 import { AlertPanel } from './features/alerts/AlertPanel'
 import { LoginPage } from './features/auth/LoginPage'
+import { useAuth, type Profile } from './features/auth/useAuth'
+import { AccountSettings } from './features/auth/AccountSettings'
 import { EcDosePanel } from './features/ec-dose/EcDosePanel'
 import { MonitoringSection } from './features/monitoring/MonitoringSection'
 import { HealthOverview } from './features/overview/HealthOverview'
@@ -14,25 +16,35 @@ import type { AlertDecision, UserRole } from './types/dashboard'
 import './App.css'
 
 function App() {
-  const [role, setRole] = useState<UserRole | null>(() => {
-    const storedRole = window.sessionStorage.getItem('leafy-demo-role')
-    return storedRole === 'viewer' || storedRole === 'operator' ? storedRole : null
-  })
+  const auth = useAuth()
+  if (auth.session === null && !auth.error) return <LoginPage />
+  if (!auth.user || auth.error) {
+    return <main className="auth-gate">
+      <h1>{auth.error ? 'Account unavailable' : 'Opening your greenhouse…'}</h1>
+      <p role={auth.error ? 'alert' : 'status'}>{auth.error || 'Checking your session and loading your account.'}</p>
+      {auth.error && <button className="auth-submit" onClick={auth.session ? auth.retry : () => window.location.reload()}>Try again</button>}
+      {auth.session && <button disabled={auth.signingOut} onClick={() => void auth.signOut()}>Sign out</button>}
+      {auth.logoutError && <p role="alert">{auth.logoutError}</p>}
+    </main>
+  }
+  const role: UserRole = auth.user.roles.includes('admin') ? 'admin'
+    : auth.user.roles.includes('operator') ? 'operator' : 'viewer'
+  return <Dashboard key={auth.user.id} role={role} signOut={() => void auth.signOut()}
+    user={auth.user} onProfile={auth.updateProfile}
+    onDeleted={() => void auth.finishAccountDeletion()}
+    signingOut={auth.signingOut} logoutError={auth.logoutError} />
+}
+
+function Dashboard({ role, signOut, signingOut, logoutError, user, onProfile, onDeleted }: {
+  role: UserRole; signOut: () => void; signingOut: boolean; logoutError: string
+  user: Profile; onProfile: (user: Profile) => void
+  onDeleted: () => void
+}) {
+  const [accountOpen, setAccountOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [alertDecision, setAlertDecision] = useState<AlertDecision>('pending')
 
-  if (!role) {
-    return (
-      <LoginPage
-        onLogin={(nextRole) => {
-          window.sessionStorage.setItem('leafy-demo-role', nextRole)
-          setRole(nextRole)
-        }}
-      />
-    )
-  }
-
-  const canControl = role === 'operator'
+  const canControl = role === 'operator' || role === 'admin'
 
   const changeAlertDecision = (nextDecision: AlertDecision) => {
     setAlertDecision(nextDecision)
@@ -46,19 +58,21 @@ function App() {
 
   return (
     <div className="app-shell">
+      {accountOpen && <AccountSettings user={user} onProfile={onProfile}
+        onClose={() => setAccountOpen(false)} onDeleted={onDeleted} />}
       <AppSidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
 
       <main>
         <Topbar
           role={role}
-          onLogout={() => {
-            window.sessionStorage.removeItem('leafy-demo-role')
-            window.history.replaceState(null, '', window.location.pathname)
-            setRole(null)
-          }}
+          displayName={[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
+          onAccount={() => setAccountOpen(true)}
+          onLogout={signOut}
+          signingOut={signingOut}
           onOpenMenu={() => setMenuOpen(true)}
         />
         <div className="dashboard">
+          {logoutError && <p className="auth-error" role="alert">{logoutError}</p>}
           <WelcomePanel />
           <AlertPanel canControl={canControl} decision={alertDecision} onDecision={changeAlertDecision} />
           <HealthOverview />

@@ -99,10 +99,34 @@ The current and planned account endpoints are:
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/v1/users/me` | Implemented: read the authenticated user's profile and roles |
-| `PATCH` | `/api/v1/users/me` | Update the authenticated user's profile |
-| `DELETE` | `/api/v1/users/me` | Delete the authenticated user's account |
+| `PATCH` | `/api/v1/users/me` | Implemented: update only firstName and lastName |
+| `DELETE` | `/api/v1/users/me` | Implemented: permanently delete the authenticated account; apply the deletion SQL migration first |
 | `GET` | `/api/v1/admin/users` | List users as an administrator |
 | `PATCH` | `/api/v1/admin/users/{userId}` | Update a user's application role as an administrator |
 | `DELETE` | `/api/v1/admin/users/{userId}` | Delete a user as an administrator |
 
 Permission checks for `viewer`, `operator`, and `admin` are the next backend layer; the current endpoint verifies identity and returns assigned roles but does not yet authorize device operations by role.
+
+## Account settings
+
+`PATCH /api/v1/users/me` accepts `firstName` and `lastName` only (maximum 100
+characters each). Omitted fields are unchanged; null, empty or whitespace-only
+names clear the field. Other fields, including roles, email and user IDs, return
+422. The response is the same profile shape as GET, with a fresh `updatedAt`.
+
+Password changes use Supabase Auth `updateUser({ password })` directly, including
+email reauthentication when Supabase requires it. Passwords are not stored in
+`public.users` or sent to the Leafy profile API.
+
+`DELETE /api/v1/users/me` calls the server-only Supabase Auth admin API with the
+authenticated token's subject, and returns 204 with no body. The client asks for
+the account email as confirmation before sending the request. Failed upstream
+deletion returns 503 and does not trigger separate profile or role deletions.
+
+Before enabling live deletion, run [account-deletion.sql](sql/account-deletion.sql)
+in the Supabase SQL Editor. It changes the existing foreign keys so that deleting
+an Auth account cascades to its profile and role memberships, while `assigned_by`
+references become null and other people's role assignments remain intact.
+All changes happen inside a transaction. Review additional foreign keys using the
+query at the end; storage ownership or other restrictive references can still block
+deletion. The migration is provided in the repository, not automatically applied.

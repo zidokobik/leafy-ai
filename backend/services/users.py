@@ -1,10 +1,11 @@
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from httpx import HTTPError
 from postgrest.exceptions import APIError
 
-from backend.schemas.user import CurrentUserResponse
+from backend.schemas.user import CurrentUserResponse, UpdateUserProfile
 from backend.services.supabase import SupabaseConfiguration, get_supabase_admin_client
 
 
@@ -14,6 +15,29 @@ class UserProfileNotFoundError(Exception):
 
 class UserProfileQueryError(Exception):
 	pass
+
+
+def update_user_profile(
+	user_id: UUID, update: UpdateUserProfile, configuration: SupabaseConfiguration
+) -> CurrentUserResponse:
+	client = get_supabase_admin_client(configuration.url, configuration.secret_key)
+	values = update.model_dump(exclude_unset=True)
+	if values:
+		values["updated_at"] = datetime.now(UTC).isoformat()
+		try:
+			result = client.table("users").update(values).eq("user_id", str(user_id)).execute()
+			if not result.data:
+				raise UserProfileNotFoundError
+		except (APIError, HTTPError) as error:
+			raise UserProfileQueryError from error
+	return get_user_profile(user_id, configuration)
+
+
+def delete_user_account(user_id: UUID, configuration: SupabaseConfiguration) -> None:
+	client = get_supabase_admin_client(configuration.url, configuration.secret_key)
+	# The database migration handles dependent rows atomically with Auth deletion.
+	# Never delete the profile or roles first: Auth deletion itself may fail.
+	client.auth.admin.delete_user(str(user_id))
 
 
 def get_user_profile(user_id: UUID, configuration: SupabaseConfiguration) -> CurrentUserResponse:
