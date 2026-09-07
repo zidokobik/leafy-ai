@@ -34,7 +34,7 @@ export function MonitoringSection() {
 
       <div className="monitoring-grid">
         <CameraPanel />
-        <TrendPanel range={range} series={monitoring.series} snapshot={monitoring.snapshot} />
+        <TrendPanel range={range} series={monitoring.series} snapshot={monitoring.snapshot} labels={monitoring.labels} />
       </div>
     </section>
   )

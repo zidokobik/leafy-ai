@@ -1,100 +1,46 @@
 import { useEffect, useState } from 'react'
 import { apiConfig } from '../../api/config'
-import type {
-  ApiConnectionState,
-  MonitoringHistoryPoint,
-  MonitoringLatestResponse,
-} from '../../api/contracts'
+import type { ApiConnectionState, MonitoringHistoryPoint, MonitoringLatestResponse } from '../../api/contracts'
 import { monitoringApi } from '../../api/leafyApi'
 import { selectedSnapshot, trendSeries as demoTrendSeries } from '../../data/dashboard'
 import type { Metric, MonitorRange, TrendSeries } from '../../types/dashboard'
 
 const demoLatest: MonitoringLatestResponse = {
-  healthScore: 84,
-  status: 'attention',
-  temperatureC: 24.6,
-  humidityPercent: 68,
-  waterPh: 6.3,
-  nutrientEcMicrosiemens: 2700,
-  updatedAt: new Date().toISOString(),
+  healthScore: 84, status: 'attention', temperatureC: 24.6, humidityPercent: 68,
+  waterPh: 6.3, nutrientEcMicrosiemens: 2700, updatedAt: new Date().toISOString(),
 }
 
 export function toDisplayMetrics(latest: MonitoringLatestResponse): Metric[] {
   return [
-    {
-      label: 'Temperature',
-      value: `${latest.temperatureC.toFixed(1)}°C`,
-      note: 'Target 22–26°C',
-      icon: 'temperature',
-      tone: 'amber',
-    },
-    {
-      label: 'Humidity',
-      value: `${Math.round(latest.humidityPercent)}%`,
-      note: 'Target 60–75%',
-      icon: 'droplet',
-      tone: 'blue',
-    },
-    {
-      label: 'Water pH',
-      value: latest.waterPh.toFixed(1),
-      note: 'Target 5.8–6.5',
-      icon: 'activity',
-      tone: 'violet',
-    },
-    {
-      label: 'Nutrient EC',
-      value: (latest.nutrientEcMicrosiemens / 1000).toFixed(1),
-      note: latest.nutrientEcMicrosiemens > 2400 ? 'Above safe max 2.4' : 'Target 1.8–2.4',
-      icon: 'trend',
-      tone: 'mint',
-      alert: latest.nutrientEcMicrosiemens > 2400,
-    },
+    { label: 'Temperature', value: `${latest.temperatureC.toFixed(1)}°C`, note: 'Target 22–26°C', icon: 'temperature', tone: 'amber' },
+    { label: 'Humidity', value: `${Math.round(latest.humidityPercent)}%`, note: 'Target 60–75%', icon: 'droplet', tone: 'blue' },
+    { label: 'Water pH', value: latest.waterPh.toFixed(1), note: 'Target 5.8–6.5', icon: 'activity', tone: 'violet' },
+    { label: 'Nutrient EC', value: (latest.nutrientEcMicrosiemens / 1000).toFixed(1), note: 'Latest sensor reading', icon: 'trend', tone: 'mint' },
   ]
 }
 
 export function useLatestMonitoring() {
   const [latest, setLatest] = useState(demoLatest)
-  const [connectionState, setConnectionState] = useState<ApiConnectionState>(
-    apiConfig.enabled ? 'loading' : 'demo',
-  )
-
+  const [connectionState, setConnectionState] = useState<ApiConnectionState>(apiConfig.enabled ? 'loading' : 'demo')
   useEffect(() => {
     if (!apiConfig.enabled) return
-
     const controller = new AbortController()
-
-    const loadLatest = () => {
-      monitoringApi.getLatest(controller.signal)
-        .then((response) => {
-          setLatest(response)
-          setConnectionState('connected')
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setConnectionState('error')
-        })
-    }
-
-    loadLatest()
-    const timer = window.setInterval(loadLatest, apiConfig.monitoringPollMs)
-
-    return () => {
-      controller.abort()
-      window.clearInterval(timer)
-    }
+    const load = () => monitoringApi.getLatest(controller.signal).then((response) => {
+      setLatest(response); setConnectionState('connected')
+    }).catch(() => { if (!controller.signal.aborted) setConnectionState('error') })
+    load()
+    const timer = window.setInterval(load, apiConfig.monitoringPollMs)
+    return () => { controller.abort(); window.clearInterval(timer) }
   }, [])
-
   return { latest, metrics: toDisplayMetrics(latest), connectionState }
 }
 
-type NumericPointKey = 'temperatureC' | 'humidityPercent' | 'waterPh' | 'nutrientEcMicrosiemens'
+type NumericKey = 'temperatureC' | 'waterTemperatureC' | 'humidityPercent' | 'waterPh' | 'nutrientEcMicrosiemens' | 'reservoirLevelCm'
 
-function createPath(points: MonitoringHistoryPoint[], key: NumericPointKey) {
+function path(points: MonitoringHistoryPoint[], key: NumericKey) {
   const values = points.map((point) => point[key])
   const min = Math.min(...values)
-  const max = Math.max(...values)
-  const spread = Math.max(max - min, 0.001)
-
+  const spread = Math.max(Math.max(...values) - min, 0.001)
   return points.map((point, index) => {
     const x = points.length === 1 ? 0 : index / (points.length - 1) * 600
     const y = 35 - (point[key] - min) / spread * 28
@@ -102,118 +48,60 @@ function createPath(points: MonitoringHistoryPoint[], key: NumericPointKey) {
   }).join(' ')
 }
 
-function pointY(points: MonitoringHistoryPoint[], key: NumericPointKey) {
+function pointY(points: MonitoringHistoryPoint[], key: NumericKey, selected: number) {
   const values = points.map((point) => point[key])
   const min = Math.min(...values)
-  const max = Math.max(...values)
-  const spread = Math.max(max - min, 0.001)
-  const selectedIndex = Math.round((points.length - 1) * 0.76)
-  return 35 - (points[selectedIndex][key] - min) / spread * 28
+  const spread = Math.max(Math.max(...values) - min, 0.001)
+  return 35 - (points[selected][key] - min) / spread * 28
 }
 
-function binaryPath(points: MonitoringHistoryPoint[], key: 'fanOn' | 'lightOn') {
+function pumpPath(points: MonitoringHistoryPoint[]) {
   return points.map((point, index) => {
     const x = points.length === 1 ? 0 : index / (points.length - 1) * 600
-    const y = point[key] ? 13 : 31
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y}`
+    return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${point.irrigationPumpOn ? 13 : 31}`
   }).join(' ')
 }
 
 function toTrendSeries(points: MonitoringHistoryPoint[]): TrendSeries[] {
   const latest = points.at(-1)!
-  const selectedIndex = Math.round((points.length - 1) * 0.76)
-
+  const selected = Math.round((points.length - 1) * 0.76)
+  const numeric = (label: string, value: string, target: string, tone: string, key: NumericKey): TrendSeries => ({ label, value, target, tone, path: path(points, key), pointY: pointY(points, key, selected) })
   return [
-    {
-      label: 'Temperature',
-      value: `${latest.temperatureC.toFixed(1)}°C`,
-      target: '22–26°C',
-      tone: 'temperature',
-      path: createPath(points, 'temperatureC'),
-      pointY: pointY(points, 'temperatureC'),
-    },
-    {
-      label: 'Humidity',
-      value: `${Math.round(latest.humidityPercent)}%`,
-      target: '60–75%',
-      tone: 'humidity',
-      path: createPath(points, 'humidityPercent'),
-      pointY: pointY(points, 'humidityPercent'),
-    },
-    {
-      label: 'Fan',
-      value: latest.fanOn ? 'On' : 'Off',
-      target: '30 min cycle',
-      tone: 'fan',
-      path: binaryPath(points, 'fanOn'),
-      pointY: points[selectedIndex].fanOn ? 13 : 31,
-    },
-    {
-      label: 'Light',
-      value: latest.lightOn ? 'On' : 'Off',
-      target: '12 h/day',
-      tone: 'light',
-      path: binaryPath(points, 'lightOn'),
-      pointY: points[selectedIndex].lightOn ? 13 : 31,
-    },
-    {
-      label: 'pH',
-      value: latest.waterPh.toFixed(1),
-      target: '5.8–6.5',
-      tone: 'ph',
-      path: createPath(points, 'waterPh'),
-      pointY: pointY(points, 'waterPh'),
-    },
-    {
-      label: 'EC',
-      value: `${(latest.nutrientEcMicrosiemens / 1000).toFixed(1)} mS/cm`,
-      target: '1.8–2.4',
-      tone: 'ec',
-      path: createPath(points, 'nutrientEcMicrosiemens'),
-      pointY: pointY(points, 'nutrientEcMicrosiemens'),
-      alert: latest.nutrientEcMicrosiemens > 2400,
-    },
+    numeric('Temperature', `${latest.temperatureC.toFixed(1)}°C`, '22–26°C', 'temperature', 'temperatureC'),
+    numeric('Water temperature', `${latest.waterTemperatureC.toFixed(1)}°C`, '18–24°C', 'humidity', 'waterTemperatureC'),
+    numeric('Humidity', `${Math.round(latest.humidityPercent)}%`, '60–75%', 'humidity', 'humidityPercent'),
+    numeric('Reservoir level', `${latest.reservoirLevelCm.toFixed(1)} cm`, 'Sensor reading', 'fan', 'reservoirLevelCm'),
+    { label: 'Irrigation pump', value: latest.irrigationPumpOn ? 'On' : 'Off', target: 'Sensor state', tone: 'light', path: pumpPath(points), pointY: latest.irrigationPumpOn ? 13 : 31 },
+    numeric('pH', latest.waterPh.toFixed(2), '5.8–6.5', 'ph', 'waterPh'),
+    numeric('EC', `${(latest.nutrientEcMicrosiemens / 1000).toFixed(2)} mS/cm`, `${(latest.ecTargetMicrosiemens / 1000).toFixed(2)} target`, 'ec', 'nutrientEcMicrosiemens'),
   ]
 }
 
-function formatSnapshot(timestamp: string) {
-  return new Intl.DateTimeFormat('en-AU', {
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(timestamp))
+function melbourne(timestamp: string) {
+  return new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Melbourne', weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(timestamp))
+}
+
+function timeLabels(points: MonitoringHistoryPoint[]) {
+  return Array.from({ length: 5 }, (_, index) => melbourne(points[Math.round((points.length - 1) * index / 4)].timestamp))
 }
 
 export function useMonitoringHistory(range: MonitorRange) {
   const [series, setSeries] = useState(demoTrendSeries)
+  const [labels, setLabels] = useState<string[]>([])
   const [snapshot, setSnapshot] = useState(selectedSnapshot[range])
-  const [connectionState, setConnectionState] = useState<ApiConnectionState>(
-    apiConfig.enabled ? 'loading' : 'demo',
-  )
-
+  const [connectionState, setConnectionState] = useState<ApiConnectionState>(apiConfig.enabled ? 'loading' : 'demo')
   useEffect(() => {
     if (!apiConfig.enabled) return
-
     const controller = new AbortController()
-
-    monitoringApi.getHistory(range, controller.signal)
-      .then((response) => {
-        if (response.points.length === 0) return
-        setSeries(toTrendSeries(response.points))
-        const selectedIndex = Math.round((response.points.length - 1) * 0.76)
-        setSnapshot(formatSnapshot(response.points[selectedIndex].timestamp))
-        setConnectionState('connected')
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setConnectionState('error')
-      })
-
-    return () => controller.abort()
+    const load = () => monitoringApi.getHistory(range, controller.signal).then((response) => {
+      if (!response.points.length) { setSeries([]); setLabels([]); setConnectionState('connected'); return }
+      setSeries(toTrendSeries(response.points)); setLabels(timeLabels(response.points))
+      const selected = Math.round((response.points.length - 1) * 0.76)
+      setSnapshot(melbourne(response.points[selected].timestamp)); setConnectionState('connected')
+    }).catch(() => { if (!controller.signal.aborted) setConnectionState('error') })
+    load()
+    const timer = window.setInterval(load, apiConfig.historyPollMs)
+    return () => { controller.abort(); window.clearInterval(timer) }
   }, [range])
-
-  return {
-    series: apiConfig.enabled ? series : demoTrendSeries,
-    snapshot: apiConfig.enabled ? snapshot : selectedSnapshot[range],
-    connectionState,
-  }
+  return { series: apiConfig.enabled ? series : demoTrendSeries, labels: apiConfig.enabled ? labels : undefined, snapshot: apiConfig.enabled ? snapshot : selectedSnapshot[range], connectionState }
 }

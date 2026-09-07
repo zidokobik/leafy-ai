@@ -66,13 +66,16 @@ export type MonitoringLatestResponse = {
 }
 
 export type MonitoringHistoryPoint = {
+  id: string
   timestamp: string
-  temperatureC: number
-  humidityPercent: number
   waterPh: number
   nutrientEcMicrosiemens: number
-  fanOn: boolean
-  lightOn: boolean
+  waterTemperatureC: number
+  temperatureC: number
+  humidityPercent: number
+  reservoirLevelCm: number
+  irrigationPumpOn: boolean
+  ecTargetMicrosiemens: number
 }
 
 export type MonitoringHistoryResponse = {

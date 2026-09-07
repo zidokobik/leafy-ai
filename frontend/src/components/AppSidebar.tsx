@@ -5,6 +5,10 @@ import { Icon } from './Icon'
 type AppSidebarProps = {
   open: boolean
   onClose: () => void
+  displayName: string
+  onAccount: () => void
+  onLogout: () => void
+  signingOut: boolean
 }
 
 const primaryLinks = [
@@ -16,8 +20,9 @@ const primaryLinks = [
   { target: '#devices', icon: 'device' as const, label: 'Devices' },
 ]
 
-export function AppSidebar({ open, onClose }: AppSidebarProps) {
+export function AppSidebar({ open, onClose, displayName, onAccount, onLogout, signingOut }: AppSidebarProps) {
   const [activeTarget, setActiveTarget] = useState('#overview')
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const navigateTo = (targetSelector: string) => {
     setActiveTarget(targetSelector)
@@ -88,10 +93,16 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
           <a href="#help"><Icon name="help" />Help centre</a>
         </nav>
 
-        <div className="profile">
-          <div className="avatar">AM</div>
-          <div><strong>Alex Morgan</strong><span>Farm manager</span></div>
-          <button type="button" aria-label="Profile options"><Icon name="more" size={18} /></button>
+        <div className="profile account-menu">
+          <button className="profile-trigger" type="button" onClick={() => setProfileOpen((value) => !value)} aria-expanded={profileOpen} disabled={signingOut}>
+            <div className="avatar">{displayName ? displayName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() : '??'}</div>
+            <div><strong>{signingOut ? 'Signing out…' : displayName}</strong><span>Account settings</span></div>
+            <Icon name="more" size={18} />
+          </button>
+          {profileOpen && <div className="account-options sidebar-account-options">
+            <button type="button" onClick={() => { setProfileOpen(false); onAccount() }}>Account settings</button>
+            <button type="button" onClick={() => { setProfileOpen(false); onLogout() }}>Sign out</button>
+          </div>}
         </div>
       </aside>
 
