@@ -6,9 +6,10 @@ type TrendPanelProps = {
   range: MonitorRange
   series: TrendSeries[]
   snapshot: string
+  labels?: string[]
 }
 
-export function TrendPanel({ range, series, snapshot }: TrendPanelProps) {
+export function TrendPanel({ range, series, snapshot, labels }: TrendPanelProps) {
   return (
     <article className="panel trend-panel">
       <div className="trend-panel-head">
@@ -54,16 +55,15 @@ export function TrendPanel({ range, series, snapshot }: TrendPanelProps) {
       </div>
 
       <div className="shared-time-axis">
-        {monitorLabels[range].map((label) => <span key={label}>{label}</span>)}
+        {(labels ?? monitorLabels[range]).map((label) => <span key={label}>{label}</span>)}
       </div>
 
       <div className="trend-alert-note">
         <span><Icon name="alert" size={16} /></span>
         <div>
-          <strong>EC moved outside its safe range at 10:24 AM</strong>
-          <small>Temperature, humidity, fan, light and pH remained within target at the same time.</small>
+          <strong>History is sourced from sensor_data</strong>
+          <small>All authenticated users see the same sensor history, shown in Melbourne time.</small>
         </div>
-        <a href="#alerts">View alert <Icon name="arrow" size={13} /></a>
       </div>
     </article>
   )

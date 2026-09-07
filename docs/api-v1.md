@@ -80,7 +80,7 @@ The typed frontend client already reserves the following v1 paths. They are part
 | `GET` | `/api/v1/ec-dose` | Not implemented |
 | `PUT` | `/api/v1/ec-dose/settings` | Not implemented |
 | `GET` | `/api/v1/monitoring/latest` | Not implemented |
-| `GET` | `/api/v1/monitoring/history?range={range}` | Not implemented |
+| `GET` | `/api/v1/monitoring/history?range={range}` | Implemented: reads shared `sensor_data` history (`24H`, `7D`, or `30D`) |
 
 ## Authentication and account contracts
 
@@ -130,3 +130,13 @@ references become null and other people's role assignments remain intact.
 All changes happen inside a transaction. Review additional foreign keys using the
 query at the end; storage ownership or other restrictive references can still block
 deletion. The migration is provided in the repository, not automatically applied.
+
+## Monitoring history
+
+`GET /api/v1/monitoring/history?range=24H` requires a Supabase access token. It
+reads `public.sensor_data` with the server-only Supabase key, filters by the
+sensor's `created_at`, and returns the same rows to every authenticated user.
+The response uses camelCase names (`waterTemperatureC`, `reservoirLevelCm`,
+`irrigationPumpOn`, etc.); timestamps are rendered in Melbourne time by the
+frontend. The frontend refreshes this endpoint every 30 minutes for the 24H,
+7D, and 30D range tabs.

@@ -60,20 +60,14 @@ function Dashboard({ role, signOut, signingOut, logoutError, user, onProfile, on
     <div className="app-shell">
       {accountOpen && <AccountSettings user={user} onProfile={onProfile}
         onClose={() => setAccountOpen(false)} onDeleted={onDeleted} />}
-      <AppSidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <AppSidebar open={menuOpen} onClose={() => setMenuOpen(false)} displayName={[user.firstName, user.lastName].filter(Boolean).join(' ')}
+        onAccount={() => setAccountOpen(true)} onLogout={signOut} signingOut={signingOut} />
 
       <main>
-        <Topbar
-          role={role}
-          displayName={[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email}
-          onAccount={() => setAccountOpen(true)}
-          onLogout={signOut}
-          signingOut={signingOut}
-          onOpenMenu={() => setMenuOpen(true)}
-        />
+        <Topbar onOpenMenu={() => setMenuOpen(true)} />
         <div className="dashboard">
           {logoutError && <p className="auth-error" role="alert">{logoutError}</p>}
-          <WelcomePanel />
+          <WelcomePanel displayName={[user.firstName, user.lastName].filter(Boolean).join(' ')} />
           <AlertPanel canControl={canControl} decision={alertDecision} onDecision={changeAlertDecision} />
           <HealthOverview />
           <ScheduleWorkspace canControl={canControl} decision={alertDecision} />
