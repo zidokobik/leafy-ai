@@ -18,24 +18,67 @@
 .login-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
   margin-bottom: 58px;
-  color: #30372d;
-  font: 700 25px 'Manrope', sans-serif;
 }
 
-.login-brand > span,
-.login-visual-mark {
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: #b97d3f;
+.auth-switch {
+  display: flex;
+  gap: 8px;
+  margin: 28px 0 24px;
 }
 
-.login-brand > span {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+.auth-switch button {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #c5cbbb;
+  border-radius: 10px;
+  background: transparent;
+  color: #505a48;
+  cursor: pointer;
+}
+
+.auth-switch button[aria-pressed="true"], .auth-submit {
+  background: #505f45;
+  color: white;
+}
+
+.auth-form { display: grid; gap: 12px; }
+.auth-form label { font-weight: 700; color: #343b32; }
+.auth-form input {
+  min-width: 0;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #bcc4b4;
+  border-radius: 10px;
+  background: #fffdf8;
+  color: #343b32;
+  font: inherit;
+}
+.auth-form small { color: #657060; }
+.auth-submit {
+  padding: 14px 20px;
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 12px;
+}
+.auth-form :focus-visible, .auth-switch :focus-visible, .auth-gate :focus-visible {
+  outline: 3px solid #b97d3f;
+  outline-offset: 3px;
+}
+.auth-form :disabled, .auth-switch :disabled { opacity: .65; cursor: wait; }
+.auth-error, .auth-message { padding: 14px; border-radius: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.auth-error { color: #8a2923; background: #fff0ed; }
+.auth-message { color: #34522a; background: #e6efdf; }
+.auth-gate { max-width: 560px; margin: 12vh auto; padding: 24px; }
+.auth-gate button { margin-right: 12px; }
+
+.login-brand img {
+  display: block;
+  width: 190px;
+  height: auto;
 }
 
 .login-kicker {
@@ -189,10 +232,17 @@
 }
 
 .login-visual-mark {
-  width: 70px;
-  height: 70px;
-  border-radius: 20px;
+  width: fit-content;
+  border-radius: 18px;
+  padding: 10px 14px;
+  background: #ffffffeb;
   box-shadow: 0 16px 34px #17201836;
+}
+
+.login-visual-mark img {
+  display: block;
+  width: 190px;
+  height: auto;
 }
 
 .login-visual div:nth-child(2) > span {

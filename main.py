@@ -1,14 +1,16 @@
 from fastapi import FastAPI
 
+import backend.router.api
 import backend.router.camera
 import backend.router.controller
 import backend.router.history
 import backend.router.water_sensor
 import backend.settings
 
-settings = backend.settings.Settings()
-app = FastAPI(root_path="/api")
+settings = backend.settings.get_settings()
+app = FastAPI()
 
+app.include_router(backend.router.api.router)
 app.include_router(backend.router.water_sensor.router)
 app.include_router(backend.router.camera.router)
 app.include_router(backend.router.controller.router)

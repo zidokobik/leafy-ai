@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.15.0",
+    "supabase>=2.31.0",
     "uvicorn>=0.52.1",
 ]
 
@@ -19,6 +20,7 @@ indent-style = "tab"
 
 [dependency-groups]
 dev = [
+    "ruff>=0.16.5",
     "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",

@@ -29,7 +29,9 @@ The "frontend" refers to the React + TypeScript code in `frontend/`. It was prev
 
 ## Application Entry Point
 
-`main.py` is the application entry point. It creates the FastAPI app, registers the API routers, and configures the production serving behavior for the built frontend. During development, run the backend and Vite frontend as separate servers so both support reload and hot module replacement. The API is mounted under URL `/api`, and the Vite development server proxies requests from that path to FastAPI.
+`main.py` is the application entry point. It creates the FastAPI app, registers the API routers, and configures the production serving behavior for the built frontend. During development, run the backend and Vite frontend as separate servers so both support reload and hot module replacement. Leafy's version 1 API is mounted under `/api/v1`, and the Vite development server forwards `/api` requests to FastAPI without rewriting the path.
+
+The API conventions and current implementation status are documented in [`docs/api-v1.md`](docs/api-v1.md).
 
 # Getting Started for Development
 

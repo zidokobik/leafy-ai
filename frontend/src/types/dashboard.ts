@@ -2,7 +2,7 @@ import type { IconName } from '../components/Icon'
 
 export type AlertDecision = 'pending' | 'authorized' | 'rejected'
 
-export type UserRole = 'viewer' | 'operator'
+export type UserRole = 'viewer' | 'operator' | 'admin'
 
 export type ControlKey = 'fan' | 'light' | 'water' | 'ph'
 
