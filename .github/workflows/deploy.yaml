@@ -1,0 +1,48 @@
+name: "Deploy"
+
+on:
+  workflow_run:
+    workflows: ["Test"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH into VPS, build frontend and start app on port 8000
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            set -e
+
+            # Make sure uv and node are in the $PATH
+            export PATH=$PATH:/home/${{ secrets.VPS_USER }}/.local/bin
+            export PATH=$PATH:/home/${{ secrets.VPS_USER }}/.nvm/versions/node/v24.19.0/bin
+
+            cd leafy-ai
+
+            git fetch
+            git checkout origin/main
+
+            # Synchronize dependencies and environment
+            uv sync
+
+            # Build frontend
+            (cd frontend \
+            && npm install \
+            && npm run build)
+
+            # restart tmux app
+            tmux kill-session -t leafy || true
+            tmux new-session -d -s leafy '.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000'
+      - name: Assert app is serving
+        run: |
+          sleep 5
+          curl --connect-timeout 5 --max-time 10 http://${{ secrets.VPS_HOST }}:8000 || (echo "App is not serving" && exit 1)
