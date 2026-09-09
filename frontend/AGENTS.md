@@ -37,4 +37,4 @@ Git history is not included in this checkout, so no repository-specific commit c
 
 ## Security & Configuration
 
-Do not commit secrets or local environment files. Expose browser-safe variables only through Vite’s `VITE_` prefix, document required values, and keep sensitive credentials on the server side.
+Do not commit secrets or local environment files. The root `.env` is the shared configuration source for the frontend and backend. Expose browser-safe variables only through Vite's `VITE_` or `PUBLIC_` prefixes, document required values, and keep sensitive credentials on the server side.

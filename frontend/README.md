@@ -12,9 +12,9 @@ A responsive React dashboard for monitoring and safely operating a Sweet basil g
 
 ## Environment setup
 
-Copy `.env.example` to `.env.local`. Set `VITE_API_BASE_URL=/` to send API requests through the Vite development proxy, and provide `VITE_SUPABASE_URL` plus `VITE_SUPABASE_PUBLISHABLE_KEY` for Supabase Auth.
+Copy the root `.env.example` to the root `.env`. Set `VITE_API_BASE_URL=/` to send API requests through the Vite development proxy, and provide `PUBLIC_SUPABASE_URL` plus `PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Supabase Auth.
 
-Only the browser-safe Supabase publishable key belongs in `frontend/.env.local`. Keep the Supabase secret key in the backend root `.env`.
+Vite reads the root `.env` through its configured environment directory. Only values prefixed with `VITE_` or `PUBLIC_` are exposed to the browser; keep `SUPABASE_SECRET_KEY` and other secrets unprefixed.
 
 The typed REST client lives under `src/api/`. See [the Leafy API v1 specification](../docs/api-v1.md) for the endpoint conventions and current implementation status.
 

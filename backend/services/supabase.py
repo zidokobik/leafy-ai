@@ -14,15 +14,15 @@ class SupabaseConfiguration:
 
 
 def get_supabase_configuration(settings: Settings) -> SupabaseConfiguration:
-	if not settings.SUPABASE_URL or not settings.SUPABASE_PUBLISHABLE_KEY or not settings.SUPABASE_SECRET_KEY:
+	if not settings.PUBLIC_SUPABASE_URL or not settings.PUBLIC_SUPABASE_PUBLISHABLE_KEY or not settings.SUPABASE_SECRET_KEY:
 		raise HTTPException(
 			status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
 			detail="Supabase is not configured on the API server",
 		)
 
 	return SupabaseConfiguration(
-		url=settings.SUPABASE_URL,
-		publishable_key=settings.SUPABASE_PUBLISHABLE_KEY,
+		url=settings.PUBLIC_SUPABASE_URL,
+		publishable_key=settings.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
 		secret_key=settings.SUPABASE_SECRET_KEY.get_secret_value(),
 	)
 

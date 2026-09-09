@@ -63,6 +63,9 @@ Edit the `.env` file to set the environment variables as needed, some examples i
 - `ENVIRONMENT`: `development` for development or `production` for production.
 - `AI_GATEWAY_API_KEY`: the API key for the Vercel AI Gateway.
 - `AI_MODEL`: the model to use as the agent. See (https://vercel.com/ai-gateway/models) for available models. The model must have vision and tool-calling capabilities.
+- `PUBLIC_SUPABASE_URL`: the URL of your Supabase project.
+- `PUBLIC_SUPABASE_PUBLISHABLE_KEY`: the publishable key for your Supabase project.
+- `SUPABASE_SECRET_KEY`: the secret key for your Supabase project (never expose this to the frontend).
 
 ### Run the development servers
 

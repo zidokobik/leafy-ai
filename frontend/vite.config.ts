@@ -12,4 +12,6 @@ export default defineConfig({
       },
     },
   },
+  envDir: '..',
+  envPrefix: ["VITE_", "PUBLIC_"]
 })
