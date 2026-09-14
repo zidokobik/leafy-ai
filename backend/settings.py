@@ -15,6 +15,10 @@ class Settings(BaseSettings):
 	JWT_SECRET_KEY: SecretStr
 	SESSION_COOKIE_NAME: str = "leafy_session"
 	SESSION_TTL_SECONDS: int = 60 * 60 * 24 * 7
+	# Defaults to Secure cookies in production. Set to false only if the app is
+	# temporarily served without HTTPS (e.g. testing on a VPS by bare IP);
+	# browsers silently refuse to store Secure cookies over plain HTTP.
+	SESSION_COOKIE_SECURE: bool | None = None
 
 	model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

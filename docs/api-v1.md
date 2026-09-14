@@ -97,6 +97,12 @@ clears that cookie. Every other endpoint under `/api/v1` that requires
 authentication reads the session cookie; the browser never receives the token
 directly and no `Authorization` header is used.
 
+The cookie is also marked `Secure` whenever `ENVIRONMENT=production`, which
+requires the app to be served over HTTPS. Browsers silently discard `Secure`
+cookies sent over plain HTTP, which looks like login succeeding but the session
+not surviving a page reload. Set `SESSION_COOKIE_SECURE=false` only if you are
+temporarily deploying without TLS.
+
 There is a single account tier: every signed-in user has full access. There are
 no per-user roles to manage.
 

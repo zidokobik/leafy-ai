@@ -44,6 +44,12 @@ def decode_session_token(token: str, settings: Settings) -> UUID:
 		raise InvalidSessionTokenError from error
 
 
+def _cookie_is_secure(settings: Settings) -> bool:
+	if settings.SESSION_COOKIE_SECURE is not None:
+		return settings.SESSION_COOKIE_SECURE
+	return settings.ENVIRONMENT.lower() == "production"
+
+
 def set_session_cookie(response: Response, token: str, settings: Settings) -> None:
 	response.set_cookie(
 		key=settings.SESSION_COOKIE_NAME,
@@ -51,7 +57,7 @@ def set_session_cookie(response: Response, token: str, settings: Settings) -> No
 		max_age=settings.SESSION_TTL_SECONDS,
 		httponly=True,
 		samesite="lax",
-		secure=settings.ENVIRONMENT == "production",
+		secure=_cookie_is_secure(settings),
 		path="/",
 	)
 
