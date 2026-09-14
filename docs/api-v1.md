@@ -63,7 +63,9 @@ The current backend implementations are mocks. They now share the `/api/v1` name
 | `GET` | `/api/v1/controller/ec_doser` | Returns mock EC doser status |
 | `PUT` | `/api/v1/controller/ec_doser?on={boolean}` | Returns the requested mock EC doser status |
 | `GET` | `/api/v1/historical-data/` | Returns generic hardcoded historical records |
-| `GET` | `/api/v1/users/me` | Verifies a Supabase access token and returns the user's profile and roles |
+| `POST` | `/api/v1/auth/login` | Verifies email/password and sets the session cookie |
+| `POST` | `/api/v1/auth/logout` | Clears the session cookie |
+| `GET` | `/api/v1/users/me` | Verifies the session cookie and returns the user's profile |
 
 ## Reserved frontend contracts
 
@@ -80,63 +82,42 @@ The typed frontend client already reserves the following v1 paths. They are part
 | `GET` | `/api/v1/ec-dose` | Not implemented |
 | `PUT` | `/api/v1/ec-dose/settings` | Not implemented |
 | `GET` | `/api/v1/monitoring/latest` | Not implemented |
-| `GET` | `/api/v1/monitoring/history?range={range}` | Implemented: reads shared `sensor_data` history (`24H`, `7D`, or `30D`) |
+| `GET` | `/api/v1/monitoring/history?range={range}` | Not implemented (temporarily disabled while auth is reworked; previously read Supabase `sensor_data`) |
 
 ## Authentication and account contracts
 
-The React application signs up, signs in, and signs out directly through Supabase Auth. Leafy does not duplicate those operations under `/api/v1/auth/*`.
+Leafy is an internal application with no public sign-up. Accounts are created by
+an administrator using the Typer CLI (`uv run python -m backend.cli create-user`).
+The frontend only exposes a sign-in page.
 
-Protected Leafy endpoints receive the Supabase access token in the request header:
+`POST /api/v1/auth/login` accepts `{ "email": "...", "password": "..." }`, verifies
+the password (Argon2 via `pwdlib`), and sets an HttpOnly, `SameSite=Lax` session
+cookie containing a signed JWT (`JWT_SECRET_KEY`, HS256). `POST /api/v1/auth/logout`
+clears that cookie. Every other endpoint under `/api/v1` that requires
+authentication reads the session cookie; the browser never receives the token
+directly and no `Authorization` header is used.
 
-```http
-Authorization: Bearer <access-token>
-```
+There is a single account tier: every signed-in user has full access. There are
+no per-user roles to manage.
 
-FastAPI verifies the token, uses its `sub` claim as the authenticated user's ID, and queries `public.users` plus the role tables with a server-only Supabase secret key. The browser must never receive that secret key.
-
-The current and planned account endpoints are:
+The current account endpoints are:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/v1/users/me` | Implemented: read the authenticated user's profile and roles |
+| `GET` | `/api/v1/users/me` | Implemented: read the authenticated user's profile |
 | `PATCH` | `/api/v1/users/me` | Implemented: update only firstName and lastName |
-| `DELETE` | `/api/v1/users/me` | Implemented: permanently delete the authenticated account; apply the deletion SQL migration first |
-| `GET` | `/api/v1/admin/users` | List users as an administrator |
-| `PATCH` | `/api/v1/admin/users/{userId}` | Update a user's application role as an administrator |
-| `DELETE` | `/api/v1/admin/users/{userId}` | Delete a user as an administrator |
-
-Permission checks for `viewer`, `operator`, and `admin` are the next backend layer; the current endpoint verifies identity and returns assigned roles but does not yet authorize device operations by role.
+| `PUT` | `/api/v1/users/me/password` | Implemented: change the authenticated user's password |
+| `DELETE` | `/api/v1/users/me` | Implemented: permanently delete the authenticated account |
 
 ## Account settings
 
 `PATCH /api/v1/users/me` accepts `firstName` and `lastName` only (maximum 100
 characters each). Omitted fields are unchanged; null, empty or whitespace-only
-names clear the field. Other fields, including roles, email and user IDs, return
+names clear the field. Other fields, including email and user IDs, return
 422. The response is the same profile shape as GET, with a fresh `updatedAt`.
 
-Password changes use Supabase Auth `updateUser({ password })` directly, including
-email reauthentication when Supabase requires it. Passwords are not stored in
-`public.users` or sent to the Leafy profile API.
+`PUT /api/v1/users/me/password` accepts `{ "newPassword": "..." }` (minimum 8
+characters) and re-hashes it with Argon2. It returns 204 with no body.
 
-`DELETE /api/v1/users/me` calls the server-only Supabase Auth admin API with the
-authenticated token's subject, and returns 204 with no body. The client asks for
-the account email as confirmation before sending the request. Failed upstream
-deletion returns 503 and does not trigger separate profile or role deletions.
-
-Before enabling live deletion, run [account-deletion.sql](sql/account-deletion.sql)
-in the Supabase SQL Editor. It changes the existing foreign keys so that deleting
-an Auth account cascades to its profile and role memberships, while `assigned_by`
-references become null and other people's role assignments remain intact.
-All changes happen inside a transaction. Review additional foreign keys using the
-query at the end; storage ownership or other restrictive references can still block
-deletion. The migration is provided in the repository, not automatically applied.
-
-## Monitoring history
-
-`GET /api/v1/monitoring/history?range=24H` requires a Supabase access token. It
-reads `public.sensor_data` with the server-only Supabase key, filters by the
-sensor's `created_at`, and returns the same rows to every authenticated user.
-The response uses camelCase names (`waterTemperatureC`, `reservoirLevelCm`,
-`irrigationPumpOn`, etc.); timestamps are rendered in Melbourne time by the
-frontend. The frontend refreshes this endpoint every 30 minutes for the 24H,
-7D, and 30D range tabs.
+`DELETE /api/v1/users/me` deletes the user row and returns 204 with no body. The
+client asks for the account email as confirmation before sending the request.

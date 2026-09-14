@@ -1,5 +1,4 @@
 import { apiConfig } from './config'
-import { supabase } from '../Supabase'
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
@@ -34,11 +33,6 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   try {
     const headers = new Headers(options.headers)
-    if (!headers.has('Authorization')) {
-      const { data, error } = await supabase.auth.getSession()
-      if (error) throw error
-      if (data.session) headers.set('Authorization', `Bearer ${data.session.access_token}`)
-    }
     headers.set('Accept', 'application/json')
     if (options.body !== undefined) headers.set('Content-Type', 'application/json')
     const response = await fetch(`${apiConfig.baseUrl}${path}`, {
@@ -48,6 +42,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       headers,
       signal: controller.signal,
     })
+
 
     if (!response.ok) {
       const details = await response.json().catch(() => undefined)

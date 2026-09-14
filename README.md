@@ -63,9 +63,8 @@ Edit the `.env` file to set the environment variables as needed, some examples i
 - `ENVIRONMENT`: `development` for development or `production` for production.
 - `AI_GATEWAY_API_KEY`: the API key for the Vercel AI Gateway.
 - `AI_MODEL`: the model to use as the agent. See (https://vercel.com/ai-gateway/models) for available models. The model must have vision and tool-calling capabilities.
-- `PUBLIC_SUPABASE_URL`: the URL of your Supabase project.
-- `PUBLIC_SUPABASE_PUBLISHABLE_KEY`: the publishable key for your Supabase project.
-- `SUPABASE_SECRET_KEY`: the secret key for your Supabase project (never expose this to the frontend).
+- `DATABASE_URI`: an `asyncpg` connection string for the Postgres database (a Supabase-hosted Postgres database works fine; only its database connection is used, not its Auth/BaaS features).
+- `JWT_SECRET_KEY`: a random secret used to sign session tokens. Generate one with `openssl rand -hex 32`.
 
 ### Run the development servers
 
@@ -109,6 +108,21 @@ This will create `frontend/dist/`, which contains the static files for the front
 ```bash
 uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
+
+# Authentication
+
+Leafy is an internal application: there is no public sign-up. Accounts are created
+by an administrator using the Typer-based CLI, and users sign in with email and
+password from the login page. A signed-in session is stored as an HttpOnly cookie;
+the frontend never handles or stores tokens directly.
+
+Create a user:
+```bash
+uv run python -m backend.cli create-user --email <email> --password <password>
+```
+
+Other available commands: `list-users` and `delete-user <user-id>`. Run
+`uv run python -m backend.cli --help` for details.
 
 # Some Questions You Might Have
 ### 1. Why separate the app into different languages (Python and JavaScript)? Why not use a single full-stack framework like `Next.js` for both the frontend and backend, this would make the project simpler and easier to maintain.

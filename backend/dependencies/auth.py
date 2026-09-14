@@ -1,65 +1,28 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from httpx import HTTPError
-from supabase_auth.errors import AuthApiError, AuthError, AuthRetryableError, AuthUnknownError
+from fastapi import Depends, HTTPException, Request, status
 
 from backend.schemas.user import AuthenticatedUser
-from backend.services.supabase import get_supabase_auth_client, get_supabase_configuration
+from backend.services.auth import InvalidSessionTokenError, decode_session_token
 from backend.settings import Settings, get_settings
 
-bearer_scheme = HTTPBearer(auto_error=False)
 
-
-def unauthorized(detail: str = "Invalid or expired access token") -> HTTPException:
-	return HTTPException(
-		status_code=status.HTTP_401_UNAUTHORIZED,
-		detail=detail,
-		headers={"WWW-Authenticate": "Bearer"},
-	)
+def unauthorized(detail: str = "Invalid or expired session") -> HTTPException:
+	return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
 
 def get_current_auth_user(
-	credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+	request: Request,
 	settings: Annotated[Settings, Depends(get_settings)],
 ) -> AuthenticatedUser:
-	if credentials is None:
-		raise unauthorized("Bearer access token is required")
-
-	configuration = get_supabase_configuration(settings)
-	auth_client = get_supabase_auth_client(configuration.url, configuration.publishable_key)
+	token = request.cookies.get(settings.SESSION_COOKIE_NAME)
+	if token is None:
+		raise unauthorized("Sign in is required")
 
 	try:
-		claims_response = auth_client.auth.get_claims(credentials.credentials)
-	except (AuthRetryableError, AuthUnknownError, HTTPError) as error:
-		raise HTTPException(
-			status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-			detail="Unable to verify the access token",
-		) from error
-	except AuthApiError as error:
-		if error.status >= 500:
-			raise HTTPException(
-				status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-				detail="Unable to verify the access token",
-			) from error
-		raise unauthorized() from error
-	except (AuthError, KeyError, TypeError, ValueError) as error:
+		user_id: UUID = decode_session_token(token, settings)
+	except InvalidSessionTokenError as error:
 		raise unauthorized() from error
 
-	if claims_response is None:
-		raise unauthorized()
-
-	claims = claims_response["claims"]
-	expected_issuer = f"{configuration.url}/auth/v1"
-	if claims.get("iss") != expected_issuer:
-		raise unauthorized()
-
-	try:
-		user_id = UUID(str(claims["sub"]))
-	except (KeyError, TypeError, ValueError) as error:
-		raise unauthorized() from error
-
-	email = claims.get("email")
-	return AuthenticatedUser(id=user_id, email=email if isinstance(email, str) else None)
+	return AuthenticatedUser(id=user_id)

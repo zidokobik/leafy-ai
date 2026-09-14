@@ -7,7 +7,12 @@ from pydantic.alias_generators import to_camel
 
 class AuthenticatedUser(BaseModel):
 	id: UUID
-	email: str | None = None
+
+
+class LoginRequest(BaseModel):
+	model_config = ConfigDict(extra="forbid")
+	email: str
+	password: str
 
 
 class UpdateUserProfile(BaseModel):
@@ -21,6 +26,11 @@ class UpdateUserProfile(BaseModel):
 		return (value.strip() or None) if isinstance(value, str) else value
 
 
+class UpdateUserPassword(BaseModel):
+	model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+	new_password: str = Field(min_length=8, max_length=200)
+
+
 class CurrentUserResponse(BaseModel):
 	model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
@@ -28,7 +38,6 @@ class CurrentUserResponse(BaseModel):
 	email: str
 	first_name: str | None = None
 	last_name: str | None = None
-	roles: list[str] = Field(default_factory=list)
 	created_at: datetime
 	updated_at: datetime | None = None
 	last_login_at: datetime | None = None

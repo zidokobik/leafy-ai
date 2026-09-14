@@ -9,9 +9,12 @@ class Settings(BaseSettings):
 	ENVIRONMENT: Literal["development", "production"] = "development"
 	AI_GATEWAY_API_KEY: SecretStr
 	AI_MODEL: str
-	PUBLIC_SUPABASE_URL: str | None = None
-	PUBLIC_SUPABASE_PUBLISHABLE_KEY: str | None = None
-	SUPABASE_SECRET_KEY: SecretStr | None = None
+
+	DATABASE_URI: SecretStr
+
+	JWT_SECRET_KEY: SecretStr
+	SESSION_COOKIE_NAME: str = "leafy_session"
+	SESSION_TTL_SECONDS: int = 60 * 60 * 24 * 7
 
 	model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

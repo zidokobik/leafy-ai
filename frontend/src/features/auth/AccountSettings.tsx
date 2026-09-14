@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { supabase } from '../../Supabase'
 import { ApiError, apiRequest } from '../../api/client'
 import type { Profile } from './useAuth'
 import './AccountSettings.css'
@@ -25,8 +24,6 @@ export function AccountSettings({ user, onProfile, onClose, onDeleted }: Props) 
   const [lastName, setLastName] = useState(user.lastName ?? '')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
-  const [nonce, setNonce] = useState('')
-  const [needsCode, setNeedsCode] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteEmail, setDeleteEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -67,21 +64,12 @@ export function AccountSettings({ user, onProfile, onClose, onDeleted }: Props) 
     event.preventDefault()
     void perform(async () => {
       if (password !== confirmation) throw new Error('Passwords do not match.')
-      const { error: updateError } = await supabase.auth.updateUser({ password, ...(needsCode ? { nonce: nonce.trim() } : {}) })
-      if (updateError) {
-        if (updateError.code === 'reauthentication_needed') {
-          setNeedsCode(true)
-          const { error: codeError } = await supabase.auth.reauthenticate()
-          if (codeError) throw codeError
-          setMessage('Check your email for a security code, then enter it below to finish changing your password.')
-          return
-        }
-        throw updateError
-      }
+      await apiRequest<void>('/api/v1/users/me/password', {
+        method: 'PUT',
+        body: { newPassword: password },
+      })
       setPassword('')
       setConfirmation('')
-      setNonce('')
-      setNeedsCode(false)
       setMessage('Your password has been updated. Use it the next time you sign in.')
     })
   }
@@ -123,15 +111,6 @@ export function AccountSettings({ user, onProfile, onClose, onDeleted }: Props) 
         <small>Use at least 8 characters.</small>
         <label htmlFor="confirm-password">Confirm new password</label>
         <input id="confirm-password" type="password" required autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
-        {needsCode && <>
-          <label htmlFor="security-code">Email security code</label>
-          <input id="security-code" required autoComplete="one-time-code" value={nonce} onChange={(event) => setNonce(event.target.value)} />
-          <button type="button" onClick={() => void perform(async () => {
-            const { error: codeError } = await supabase.auth.reauthenticate()
-            if (codeError) throw codeError
-            setMessage('A new security code has been sent to your email.')
-          })}>Send another code</button>
-        </>}
         <button className="auth-submit" type="submit">Update password</button>
       </fieldset>
     </form>
