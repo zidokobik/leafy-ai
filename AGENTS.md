@@ -11,6 +11,23 @@ This repository contains the complete Leafy application:
 
 The frontend was previously maintained as a separate repository and is now part of this repository. Its existing organization is not completely uniform; follow the current feature-oriented structure for new work and avoid unrelated cleanup.
 
+## Database Schema
+
+- `schema.sql` is the source of truth for the current Postgres schema, including defaults, primary keys, and foreign-key constraints. Read it before adding or changing database models, queries, migrations, or API contracts that persist data.
+- Database access is asynchronous through SQLAlchemy/SQLModel and `asyncpg`; use the existing database session dependency and model conventions in `backend/`.
+- The schema is organized into these domains:
+	- Identity and authorization: `users`, `roles`, `permissions`, `user_role`, and `role_permission`.
+	- Monitoring: `sensor_data`, `devices`, `device_limits`, `levels`, and `cameras`.
+	- Crop operations: `crop_cycles`, `growth_stages`, `grow_schedules`, and `schedule_targets`.
+	- Vision and automation: `images`, `ai_decisions`, `decision_evidence`, `approvals`, and `command_executions`.
+	- Notifications and auditability: `alerts` and `audit_log`.
+- Follow the explicit foreign keys in `schema.sql`: devices and cameras belong to levels; crop cycles belong to levels and reference growth stages; grow schedules belong to crop cycles; schedule targets reference schedules and growth stages; AI decisions reference crop cycles, schedules, and devices; decision evidence references decisions, sensor readings, and images; approvals reference decisions and users; command executions reference decisions, devices, and users; alerts reference devices, decisions, crop cycles, and users; audit records reference users.
+- Do not infer a foreign-key relationship from a similarly named column. For example, `images.crop_cycle_id`, `images.experiment_id`, and `audit_log.entity_id` are not declared foreign keys in `schema.sql`.
+- Preserve database ID types when creating models or schemas: UUIDs are used for users, permissions, sensor readings, levels, and devices; identity `int8` values are used by most operational, decision, alert, and audit tables. Do not convert IDs to strings or integers merely for frontend convenience.
+- Nullable columns are intentional. Keep optional fields optional in Pydantic schemas and handle missing measurements, targets, relationships, and status values explicitly.
+- `sensor_data` is time-series-like monitoring data keyed by `created_at`; `images` are camera captures keyed by `captured_at`. Keep timestamps timezone-aware and use the database timestamps rather than client-generated event times when recording persisted events.
+- Treat join tables (`user_role` and `role_permission`) and evidence tables as relationships, not duplicated domain records. Preserve their composite key behavior when querying or writing them.
+
 ## Framework
 
 - Runtime: Python 3.14+
