@@ -9,6 +9,7 @@ import { useAuth, type Profile } from './features/auth/useAuth'
 import { AccountSettings } from './features/auth/AccountSettings'
 import { EcDosePanel } from './features/ec-dose/EcDosePanel'
 import { MonitoringSection } from './features/monitoring/MonitoringSection'
+import AIActionLog from './features/action-log/AIActionLog'
 import { HealthOverview } from './features/overview/HealthOverview'
 import { WelcomePanel } from './features/overview/WelcomePanel'
 import { ScheduleWorkspace } from './features/schedule/ScheduleWorkspace'
@@ -76,7 +77,7 @@ function Dashboard({ signOut, signingOut, logoutError, user, onProfile, onDelete
           <HealthOverview />
           <ScheduleWorkspace canControl={canControl} decision={alertDecision} />
           <EcDosePanel canControl={canControl} />
-          <MonitoringSection />
+          <MonitoringSection /> <AIActionLog />
         </div>
       </main>
     </div>
