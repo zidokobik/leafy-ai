@@ -1,20 +1,12 @@
 from fastapi import FastAPI
 
 import backend.router.api
-import backend.router.camera
-import backend.router.controller
-import backend.router.history
-import backend.router.water_sensor
 import backend.settings
 
 settings = backend.settings.get_settings()
 app = FastAPI()
 
 app.include_router(backend.router.api.router)
-app.include_router(backend.router.water_sensor.router)
-app.include_router(backend.router.camera.router)
-app.include_router(backend.router.controller.router)
-app.include_router(backend.router.history.router)
 
 # Serve the built frontend during production.
 # During development, it is recommended to serve the frontend separately (`npm run dev`) to take advantage of live reloading and other Vite features.
