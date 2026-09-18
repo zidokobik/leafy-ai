@@ -1,39 +1,30 @@
-from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-router = APIRouter(prefix="/historical-data", tags=["Historical Data"])
+from backend.dependencies.auth import get_current_auth_user
+from backend.dependencies.database_session import AsyncDatabaseSession
+from backend.schemas.monitoring import MonitoringHistoryResponse, MonitoringLatestResponse, MonitorRange
+from backend.services.monitoring import get_history, get_latest
 
-
-class HistoricalRecord(BaseModel):
-	id: int
-	record_date: date
-	metric_value: float
-	category: str
+router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
 
-MOCK_DB = [
-	{"id": 1, "record_date": date(2026, 1, 1), "metric_value": 105.2, "category": "temperature"},
-	{"id": 2, "record_date": date(2026, 2, 1), "metric_value": 108.7, "category": "temperature"},
-]
+@router.get("/latest", response_model=MonitoringLatestResponse)
+async def read_latest_monitoring(
+	_: Annotated[object, Depends(get_current_auth_user)],
+	session: AsyncDatabaseSession,
+) -> MonitoringLatestResponse:
+	latest = await get_latest(session)
+	if latest is None:
+		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No sensor data is available")
+	return latest
 
 
-@router.get("/", response_model=list[HistoricalRecord])
-def get_historical_data(
-	start_date: Annotated[date | None, Query(description="Filter from this date")] = None,
-	end_date: Annotated[date | None, Query(description="Filter up to this date")] = None,
-	limit: Annotated[int, Query(ge=1, le=1000)] = 100,
-):
-	filtered_data = MOCK_DB
-
-	if start_date:
-		filtered_data = [row for row in filtered_data if row["record_date"] >= start_date]
-	if end_date:
-		filtered_data = [row for row in filtered_data if row["record_date"] <= end_date]
-
-	if start_date and end_date and start_date > end_date:
-		raise HTTPException(status_code=400, detail="start_date cannot be after end_date")
-
-	return filtered_data[:limit]
+@router.get("/history", response_model=MonitoringHistoryResponse)
+async def read_monitoring_history(
+	_: Annotated[object, Depends(get_current_auth_user)],
+	session: AsyncDatabaseSession,
+	monitor_range: Annotated[MonitorRange, Query(alias="range")] = "24H",
+) -> MonitoringHistoryResponse:
+	return MonitoringHistoryResponse(range=monitor_range, points=await get_history(session, monitor_range))

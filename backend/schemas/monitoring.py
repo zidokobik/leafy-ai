@@ -28,3 +28,15 @@ class MonitoringHistoryResponse(BaseModel):
 
 	range: MonitorRange
 	points: list[MonitoringHistoryPoint]
+
+
+class MonitoringLatestResponse(BaseModel):
+	model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+	health_score: int = Field(alias="healthScore", ge=0, le=100)
+	status: Literal["healthy", "attention"]
+	temperature_c: float = Field(alias="temperatureC")
+	humidity_percent: float = Field(alias="humidityPercent")
+	water_ph: float = Field(alias="waterPh")
+	nutrient_ec_microsiemens: float = Field(alias="nutrientEcMicrosiemens")
+	updated_at: datetime = Field(alias="updatedAt")

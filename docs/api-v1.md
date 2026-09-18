@@ -81,8 +81,8 @@ The typed frontend client already reserves the following v1 paths. They are part
 | `PUT` | `/api/v1/alerts/ec/decision` | Not implemented |
 | `GET` | `/api/v1/ec-dose` | Not implemented |
 | `PUT` | `/api/v1/ec-dose/settings` | Not implemented |
-| `GET` | `/api/v1/monitoring/latest` | Not implemented |
-| `GET` | `/api/v1/monitoring/history?range={range}` | Not implemented (temporarily disabled while auth is reworked; previously read Supabase `sensor_data`) |
+| `GET` | `/api/v1/monitoring/latest` | Reads the newest complete row from PostgreSQL `sensor_data` |
+| `GET` | `/api/v1/monitoring/history?range={range}` | Reads complete `sensor_data` rows from the selected time range (`24H`, `7D`, or `30D`) |
 
 ## Authentication and account contracts
 
