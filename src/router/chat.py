@@ -2,7 +2,6 @@ import ai
 import ai.ui.ai_sdk
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from icecream import ic
 from pydantic import BaseModel
 
 from .water_sensor import WaterSendorReadings
@@ -95,7 +94,6 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 	# See https://ai-python.dev/docs/basics/ai-sdk-ui
 
 	messages, approvals = ai.ui.ai_sdk.to_messages(request.messages)
-	ic(messages)
 
 	ai.ui.ai_sdk.apply_approvals(approvals)
 
