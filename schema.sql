@@ -36,19 +36,6 @@ CREATE TABLE public.user_role (
   CONSTRAINT user_role_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
   CONSTRAINT user_role_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.users(user_id)
 );
-CREATE TABLE public.sensor_data (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  water_ph double precision,
-  ec_us_cm double precision,
-  water_temp_c double precision,
-  ambient_temp_c double precision,
-  humidity_pct double precision,
-  reservoir_level_cm double precision,
-  irrigation_pump_state smallint,
-  ec_target_us_cm double precision,
-  created_at timestamp with time zone NOT NULL,
-  CONSTRAINT sensor_data_pkey PRIMARY KEY (id)
-);
 CREATE TABLE public.role_permission (
   role_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   permission_id uuid NOT NULL,
@@ -165,17 +152,6 @@ CREATE TABLE public.ai_decisions (
   CONSTRAINT ai_decisions_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.grow_schedules(schedule_id),
   CONSTRAINT ai_decisions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(device_id)
 );
-CREATE TABLE public.decision_evidence (
-  evidence_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  decision_id bigint,
-  sensor_id uuid,
-  image_id bigint,
-  note character varying,
-  CONSTRAINT decision_evidence_pkey PRIMARY KEY (evidence_id),
-  CONSTRAINT decision_evidence_image_id_fkey FOREIGN KEY (image_id) REFERENCES public.images(image_id),
-  CONSTRAINT decision_evidence_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensor_data(id),
-  CONSTRAINT decision_evidence_decision_id_fkey FOREIGN KEY (decision_id) REFERENCES public.ai_decisions(decision_id)
-);
 CREATE TABLE public.approvals (
   approval_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   decision_id bigint,
@@ -229,4 +205,14 @@ CREATE TABLE public.audit_log (
   created_at timestamp with time zone NOT NULL,
   CONSTRAINT audit_log_pkey PRIMARY KEY (audit_id),
   CONSTRAINT audit_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
+);
+CREATE TABLE public.sensor_data (
+  timestamp_ms bigint NOT NULL DEFAULT ((EXTRACT(epoch FROM clock_timestamp()) * (1000)::numeric))::bigint,
+  water_ph double precision,
+  ec_us_cm double precision,
+  water_temp_c double precision,
+  ambient_temp_c double precision,
+  humidity_pct double precision,
+  reservoir_level_cm double precision,
+  CONSTRAINT sensor_data_pkey PRIMARY KEY (timestamp_ms)
 );
