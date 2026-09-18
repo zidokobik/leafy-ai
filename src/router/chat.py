@@ -99,6 +99,10 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 
 	ai.ui.ai_sdk.apply_approvals(approvals)
 
+	with open("system_prompt.md") as f:
+		system_message = ai.system_message(f.read())
+	messages.insert(0, system_message)  # Apply system prompt, see `system_prompt.md`
+
 	# model = ai.get_model("inclusionai/ling-3.0-tiny-free")  # free model atm
 	model = ai.get_model("openai/gpt-5-nano")
 
