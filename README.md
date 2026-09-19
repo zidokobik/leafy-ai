@@ -16,8 +16,9 @@ Leafy is organized as one application with a Python service layer and a React us
 │   ├── schemas/*           # Request and response models
 │   └── services/*          # Reusable business logic
 ├── frontend/               # React + TypeScript dashboard
+│   ├── components.json     # shadcn/ui configuration
 │   ├── src/*
-│   └── vite.config.ts      # Vite development and build configuration
+│   └── vite.config.ts      # Vite, React, Tailwind and proxy configuration
 └── sample-data/            # Static camera image served by the mock camera route
 ```
 
@@ -31,7 +32,9 @@ Routers stay thin: they wire up dependencies and shape responses. The work itsel
 
 The "frontend" refers to the React + TypeScript code in `frontend/`. It was previously managed separately in a different repository, but has been merged into this repository for easier development and deployment. Any changes should `cd` into the `frontend/` directory and run the frontend development server from there.
 
-The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview is the only page with real functionality today; it charts the sensor history over 24 hours, 7 days or 30 days using `recharts`. The rest are placeholders.
+The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview is the only page with real functionality today; it charts the sensor history over 24 hours, 7 days or 30 days using `recharts` through shadcn chart components. The rest are placeholders.
+
+The frontend UI is built with shadcn/ui source components, Tailwind CSS v4, and a basil-green theme defined in `frontend/src/styles/base.css`. Shared primitives live in `frontend/src/components/ui/`; compose those before adding custom markup or feature-local CSS.
 
 ## Application Entry Point
 

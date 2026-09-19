@@ -1,6 +1,6 @@
 # Leafy AI Dashboard
 
-A responsive React dashboard for monitoring and safely operating a Sweet basil greenhouse. The interface combines live conditions, human-authorized alert responses, adaptive schedules, device controls, a camera feed, and synchronized trends.
+A responsive React dashboard for monitoring a Sweet basil hydroponic farm and supporting AI-assisted growing workflows. The current dashboard focuses on authenticated access and sensor history; future pages will add agent chat, schedules and device controls.
 
 ## Commands
 
@@ -17,6 +17,24 @@ Copy the root `.env.example` to the root `.env`. Set `VITE_API_BASE_URL=/` to se
 Vite reads the root `.env` through its configured environment directory. Only values prefixed with `VITE_` are exposed to the browser.
 
 The typed REST client lives under `src/api/`. See [the Leafy API v1 specification](../docs/api-v1.md) for the endpoint conventions and current implementation status.
+
+## UI system
+
+The frontend uses shadcn/ui with Tailwind CSS v4. The shadcn configuration lives in `components.json`, shared primitives live in `src/components/ui/`, and Tailwind/theme tokens live in `src/styles/base.css`.
+
+Use shadcn primitives for common UI instead of custom component CSS:
+
+- App chrome: `Sidebar`, `DropdownMenu`, `Avatar`, `Separator`, `TooltipProvider`.
+- Forms and account settings: `Field`, `Input`, `Button`, `Alert`, `Dialog`.
+- Dashboard content: `Card`, `ToggleGroup`, `Skeleton`, `Empty`, and `Chart` wrappers around Recharts.
+
+Add shadcn components from the frontend directory:
+
+```bash
+npx shadcn@latest add <component>
+```
+
+Keep broad theme changes in `src/styles/base.css`. The current palette uses basil greens, mint surfaces and hydroponic chart accents via semantic tokens such as `--background`, `--primary`, `--sidebar`, and `--chart-*`.
 
 ## Authentication
 
@@ -40,7 +58,7 @@ Manual acceptance checks:
 
 ## Account settings and sign out
 
-Open the account button in the top-right corner for **Account settings** and
+Open the account button in the sidebar footer for **Account settings** and
 **Sign out**. The button displays the saved name, falling back to the email.
 Account settings supports optional first/last names, password changes, and
 permanent deletion with typed email confirmation.
@@ -56,28 +74,25 @@ confirm deletion on a disposable account and verify the return to sign-in.
 ```text
 src/
 ├── api/                 Typed backend contracts and REST client
-├── components/          Shared shell and visual primitives
-├── data/                Static dashboard configuration and sample data
+├── assets/              Imported images and static frontend assets
+├── components/          App shell and shared shadcn/ui primitives
 ├── features/
-│   ├── alerts/          Human authorization workflow
-│   ├── ec-dose/         EC dosing controls and live controller data
-│   ├── monitoring/      Camera and synchronized trends
-│   ├── overview/        Welcome and greenhouse health summary
-│   └── schedule/        Adaptive schedule and manual controls
-├── styles/
-│   ├── base.css         Structural component styles
-│   ├── theme.css        Warm natural visual theme
-│   └── responsive.css   Tablet, mobile, and motion preferences
-├── types/               Shared domain types
-├── App.tsx              Application composition and shared alert state
+│   ├── agents/          Placeholder for the future farm agent chat
+│   ├── auth/            Login, session state and account settings
+│   ├── devices/         Placeholder for device controls
+│   ├── overview/        Sensor history charts and range controls
+│   └── schedules/       Placeholder for grow schedules
+├── hooks/               Shared React hooks used by shadcn components
+├── lib/                 Shared utilities such as `cn`
+├── styles/base.css      Tailwind imports, shadcn tokens and global theme
+├── App.tsx              Auth gate and route declarations
 └── main.tsx             React entry point
 ```
 
 ## Maintenance notes
 
-- Keep cross-feature state in `App.tsx`; keep feature-local state inside its feature.
-- Add reusable icons to `components/Icon.tsx`.
-- Store display data and device constraints in `data/dashboard.ts` instead of duplicating values in components.
-- Keep device commands gated by an explicit operator authorization state.
+- Keep routers/pages thin: feature-specific data fetching belongs in hooks next to the feature that uses it.
+- Add new routes in `src/App.tsx` and sidebar entries in `src/components/navigation.ts`.
+- Use Lucide icons directly in components and navigation entries.
+- Compose from shadcn primitives before introducing feature-local CSS.
 - Run both `npm run lint` and `npm run build` after changes.
-# LeafyAI_team-Sprouts

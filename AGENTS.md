@@ -7,10 +7,10 @@ This repository contains the complete Leafy application:
 - `main.py` is the FastAPI application entry point. It creates the app, registers the backend routers, and serves the built frontend in production.
 - `backend/` contains the Python service layer and business logic. `backend/settings.py` contains application settings, `backend/router/` contains the API routers, `backend/schemas/` the request and response models, and `backend/services/` the reusable logic.
 - Keep routers thin. Put the actual work in `backend/services/`, where functions take an `AsyncSession` plus plain arguments rather than FastAPI dependencies, so the planned chat agent can call them as tools without going through HTTP.
-- `frontend/` contains the React and TypeScript dashboard. Its source is organized under `frontend/src/`, with API code, shared components, and feature-specific UI grouped by responsibility.
+- `frontend/` contains the React and TypeScript dashboard. Its source is organized under `frontend/src/`, with API code, shared shell components, shadcn/ui primitives, and feature-specific UI grouped by responsibility.
 - `sample-data/` contains the static camera image served by the mock camera route.
 
-The frontend uses client-side routing with one page per sidebar entry: Overview, Agents, Schedules and Devices. Only Overview is implemented; it charts sensor history over 24 hours, 7 days or 30 days. The others are placeholders. Adding a page means creating a feature folder, registering the route in `frontend/src/App.tsx`, and adding the entry to `frontend/src/components/navigation.ts`. Follow the conventions in `frontend/AGENTS.md` for frontend changes.
+The frontend uses client-side routing with one page per sidebar entry: Overview, Agents, Schedules and Devices. Only Overview is implemented; it charts sensor history over 24 hours, 7 days or 30 days using Recharts via shadcn chart components. The others are placeholders. Adding a page means creating a feature folder, registering the route in `frontend/src/App.tsx`, and adding the entry to `frontend/src/components/navigation.ts`. Follow the conventions in `frontend/AGENTS.md` for frontend changes.
 
 ## Database Schema
 
@@ -36,7 +36,7 @@ The frontend uses client-side routing with one page per sidebar entry: Overview,
 - Web framework: FastAPI
 - ASGI server: Uvicorn
 - Data validation/models: Pydantic v2
-- Frontend: React, TypeScript, and Vite, with `react-router-dom` for routing and `recharts` for charts
+- Frontend: React, TypeScript, Vite, Tailwind CSS v4, and shadcn/ui, with `react-router-dom` for routing and `recharts` for charts
 
 ## uv Workflow
 
