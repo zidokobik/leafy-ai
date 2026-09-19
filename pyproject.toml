@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "ai>=0.7.0",
     "apscheduler>=3.11.3",
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
