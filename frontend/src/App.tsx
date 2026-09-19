@@ -1,4 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AppShell } from './components/AppShell'
 import { AgentsPage } from './features/agents/AgentsPage'
 import { LoginPage } from './features/auth/LoginPage'
@@ -12,9 +15,13 @@ export default function App() {
 
   if (auth.status === 'loading') {
     return (
-      <main className="auth-gate">
-        <h1>Opening your greenhouse…</h1>
-        <p role="status">Checking your session and loading your account.</p>
+      <main className="grid min-h-svh place-items-center bg-background p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Opening your greenhouse...</CardTitle>
+            <CardDescription role="status">Checking your session and loading your account.</CardDescription>
+          </CardHeader>
+        </Card>
       </main>
     )
   }
@@ -23,11 +30,25 @@ export default function App() {
 
   if (auth.status === 'error' || !auth.user) {
     return (
-      <main className="auth-gate">
-        <h1>Account unavailable</h1>
-        <p role="alert">{auth.error || 'Unable to load your account. Please try again.'}</p>
-        <button className="auth-submit" onClick={auth.retry}>Try again</button>
-        {auth.logoutError && <p role="alert">{auth.logoutError}</p>}
+      <main className="grid min-h-svh place-items-center bg-background p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Account unavailable</CardTitle>
+            <CardDescription>Unable to finish loading your Leafy account.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Alert variant="destructive">
+              <AlertTitle>Session error</AlertTitle>
+              <AlertDescription>{auth.error || 'Unable to load your account. Please try again.'}</AlertDescription>
+            </Alert>
+            <Button onClick={auth.retry}>Try again</Button>
+            {auth.logoutError && (
+              <Alert variant="destructive">
+                <AlertDescription>{auth.logoutError}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
       </main>
     )
   }

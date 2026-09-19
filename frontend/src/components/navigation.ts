@@ -1,16 +1,17 @@
-import type { IconName } from './Icon'
+import { BotIcon, CalendarDaysIcon, LayoutDashboardIcon, SproutIcon } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
   to: string
-  icon: IconName
+  icon: LucideIcon
   label: string
 }
 
 export const navItems: NavItem[] = [
-  { to: '/', icon: 'grid', label: 'Overview' },
-  { to: '/agents', icon: 'chat', label: 'Agents' },
-  { to: '/schedules', icon: 'schedule', label: 'Schedules' },
-  { to: '/devices', icon: 'device', label: 'Devices' },
+  { to: '/', icon: LayoutDashboardIcon, label: 'Overview' },
+  { to: '/agents', icon: BotIcon, label: 'Agents' },
+  { to: '/schedules', icon: CalendarDaysIcon, label: 'Schedules' },
+  { to: '/devices', icon: SproutIcon, label: 'Devices' },
 ]
 
 export function pageTitle(pathname: string) {

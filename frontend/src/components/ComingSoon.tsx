@@ -1,4 +1,6 @@
-import { Icon } from './Icon'
+import { ClockIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 
 type ComingSoonProps = {
   title: string
@@ -8,10 +10,15 @@ type ComingSoonProps = {
 
 export function ComingSoon({ title, description, status = 'Coming soon' }: ComingSoonProps) {
   return (
-    <section className="coming-soon">
-      <span className="coming-soon-badge"><Icon name="clock" size={15} />{status}</span>
-      <h1>{title}</h1>
-      <p>{description}</p>
-    </section>
+    <Empty className="min-h-[52vh] border bg-card">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <ClockIcon />
+        </EmptyMedia>
+        <Badge variant="secondary">{status}</Badge>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   )
 }

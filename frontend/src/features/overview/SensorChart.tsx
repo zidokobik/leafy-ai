@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { SensorRange, SensorReading } from '../../api/contracts'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { buildAxis, formatMetricValue, type SensorMetric } from './sensorMetrics'
 
 const axisTimeFormats: Record<SensorRange, Intl.DateTimeFormatOptions> = {
@@ -34,16 +37,27 @@ export function SensorChart({ metric, readings, range, current }: SensorChartPro
     return values.length ? buildAxis(metric, values) : null
   }, [data, metric])
   const gradientId = `sensor-fill-${metric.key}`
-  return (
-    <article className="chart-card">
-      <header className="chart-card-head">
-        <h3>{metric.label}</h3>
-        <strong style={{ color: metric.color }}>{formatMetricValue(metric, current)}</strong>
-      </header>
+  const chartConfig = {
+    value: {
+      label: metric.label,
+      color: metric.color,
+    },
+  } satisfies ChartConfig
 
-      {axis ? (
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+  return (
+    <Card className="min-w-0">
+      <CardHeader>
+        <CardTitle>{metric.label}</CardTitle>
+        <CardDescription>Current reading</CardDescription>
+        <CardAction className="text-2xl font-medium tabular-nums" style={{ color: metric.color }}>
+          {formatMetricValue(metric, current)}
+        </CardAction>
+      </CardHeader>
+
+      <CardContent className="min-w-0">
+        {axis ? (
+          <ChartContainer config={chartConfig} initialDimension={{ width: 240, height: 288 }} className="h-72 min-w-0 w-full aspect-auto">
+            <AreaChart accessibilityLayer data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={metric.color} stopOpacity={0.3} />
@@ -71,13 +85,17 @@ export function SensorChart({ metric, readings, range, current }: SensorChartPro
               tickLine={false}
               axisLine={false}
             />
-            <Tooltip
-              labelFormatter={(label) => tooltipTime.format(Number(label))}
-              formatter={(value) => formatMetricValue(metric, typeof value === 'number' ? value : null)}
-              contentStyle={{
-                border: '1px solid #dfe3da', borderRadius: 10,
-                background: '#fffdf7', fontSize: 12, boxShadow: '0 10px 24px #273d3518',
+            <ChartTooltip
+              labelFormatter={(label) => {
+                const timestamp = Number(label)
+                return Number.isFinite(timestamp) ? tooltipTime.format(timestamp) : undefined
               }}
+              content={(
+                <ChartTooltipContent
+                  indicator="line"
+                  formatter={(value) => formatMetricValue(metric, typeof value === 'number' ? value : null)}
+                />
+              )}
             />
             <Area
               type="monotone"
@@ -90,10 +108,16 @@ export function SensorChart({ metric, readings, range, current }: SensorChartPro
               isAnimationActive={false}
             />
           </AreaChart>
-        </ResponsiveContainer>
-      ) : (
-        <p className="chart-empty">No data</p>
-      )}
-    </article>
+          </ChartContainer>
+        ) : (
+          <Empty className="h-72 border">
+            <EmptyHeader>
+              <EmptyTitle>No data</EmptyTitle>
+              <EmptyDescription>No readings are available for this sensor in the selected range.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      </CardContent>
+    </Card>
   )
 }

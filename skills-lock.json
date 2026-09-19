@@ -1,17 +1,23 @@
 {
   "version": 1,
   "skills": {
+    "ai": {
+      "source": "vercel-labs/ai-python",
+      "sourceType": "github",
+      "skillPath": "skills/ai/SKILL.md",
+      "computedHash": "6a34cbfe65cde487e2e991dbad820488deb674ac1649eeebaa21674657515854"
+    },
     "ai-sdk": {
       "source": "vercel/ai",
       "sourceType": "github",
       "skillPath": "skills/use-ai-sdk/SKILL.md",
       "computedHash": "0883204d11b055e968dee697c5858e68064c27dfd4deb6310212895daa65c5ad"
     },
-    "ai": {
-      "source": "vercel-labs/ai-python",
+    "shadcn": {
+      "source": "shadcn/ui",
       "sourceType": "github",
-      "skillPath": "skills/ai/SKILL.md",
-      "computedHash": "6a34cbfe65cde487e2e991dbad820488deb674ac1649eeebaa21674657515854"
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "f615de216e085a84e31593ad0fa9062232adc40cd87b7c7ab2b8e49abf6500be"
     }
   }
 }

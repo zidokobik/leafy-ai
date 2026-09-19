@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import leafyLogo from '../../assets/Leafy_AI_logo.png'
 import { ApiError } from '../../api/client'
-import './LoginPage.css'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 type Props = {
   onSignIn: (email: string, password: string) => Promise<void>
@@ -28,32 +32,68 @@ export function LoginPage({ onSignIn }: Props) {
   }
 
   return (
-    <main className="login-shell">
-      <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-brand"><img src={leafyLogo} alt="Leafy AI" /></div>
-        <div className="login-copy">
-          <span className="login-kicker">Your greenhouse, connected</span>
-          <h1 id="login-title">Welcome back.</h1>
-          <p>Sign in to see your greenhouse and keep track of every growing day.</p>
-        </div>
-        <form className="auth-form" onSubmit={submit} aria-busy={busy}>
-          <label htmlFor="auth-email">Email</label>
-          <input id="auth-email" type="email" autoComplete="email" required maxLength={254} value={email}
-            disabled={busy} onChange={(event) => setEmail(event.target.value)} />
-          <label htmlFor="auth-password">Password</label>
-          <input id="auth-password" type="password" autoComplete="current-password"
-            required value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} />
-          {error && <p className="auth-error" role="alert">{error}</p>}
-          <button className="auth-submit" disabled={busy} type="submit">
-            {busy ? 'Please wait…' : 'Sign in'}
-          </button>
-        </form>
+    <main className="grid min-h-svh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">
+      <section className="flex items-center justify-center p-6 md:p-10" aria-labelledby="login-title">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <img className="mb-8 h-10 w-fit" src={leafyLogo} alt="Leafy AI" />
+            <CardDescription>Your greenhouse, connected</CardDescription>
+            <CardTitle id="login-title" className="text-3xl">Welcome back.</CardTitle>
+            <CardDescription>Sign in to see your greenhouse and keep track of every growing day.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} aria-busy={busy}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="auth-email">Email</FieldLabel>
+                  <Input
+                    id="auth-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    maxLength={254}
+                    value={email}
+                    disabled={busy}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="auth-password">Password</FieldLabel>
+                  <Input
+                    id="auth-password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    disabled={busy}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </Field>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <Button disabled={busy} type="submit" className="w-full">
+                  {busy ? 'Please wait...' : 'Sign in'}
+                </Button>
+              </FieldGroup>
+            </form>
+          </CardContent>
+        </Card>
       </section>
-      <aside className="login-visual" aria-label="Leafy greenhouse">
-        <div className="login-visual-mark"><img src={leafyLogo} alt="Leafy AI" /></div>
-        <div><span>Grow with confidence</span><h2>One view for every growing decision.</h2>
-          <p>Your plants, growing conditions and daily insights, all in one place.</p></div>
-        <div className="login-status">A little care. A greener tomorrow.</div>
+      <aside className="hidden min-h-[calc(100svh-2rem)] flex-col justify-between overflow-hidden rounded-xl bg-sidebar p-10 text-sidebar-foreground ring-1 ring-sidebar-border lg:my-4 lg:mr-4 lg:flex" aria-label="Leafy greenhouse">
+        <Card className="w-fit bg-background/95">
+          <CardContent className="p-3">
+            <img className="h-10 w-auto" src={leafyLogo} alt="Leafy AI" />
+          </CardContent>
+        </Card>
+        <div className="max-w-md">
+          <p className="text-sm font-medium text-sidebar-foreground/70">Grow with confidence</p>
+          <h2 className="mt-3 text-4xl font-medium tracking-tight">One view for every growing decision.</h2>
+          <p className="mt-4 text-sm leading-6 text-sidebar-foreground/70">Your plants, growing conditions and daily insights, all in one place.</p>
+        </div>
+        <p className="text-sm font-medium text-sidebar-foreground/70">A little care. A greener tomorrow.</p>
       </aside>
     </main>
   )
