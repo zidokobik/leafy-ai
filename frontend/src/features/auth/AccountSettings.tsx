@@ -116,7 +116,7 @@ export function AccountSettings({ user, onProfile, onClose, onDeleted }: Props) 
     </form>
     <section className="account-danger" aria-labelledby="delete-title">
       <h2 id="delete-title">Delete account</h2>
-      <p>Permanently delete your account, profile and assigned roles. This cannot be undone.</p>
+      <p>Permanently delete your account and profile. This cannot be undone.</p>
       {!confirmDelete ? <button type="button" disabled={busy} onClick={() => setConfirmDelete(true)}>Delete my account</button>
         : <form onSubmit={deleteAccount}>
           <fieldset disabled={busy}>

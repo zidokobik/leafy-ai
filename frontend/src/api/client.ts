@@ -18,10 +18,6 @@ export class ApiError extends Error {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  if (!apiConfig.enabled) {
-    throw new ApiError('VITE_API_BASE_URL is not configured', 0)
-  }
-
   const controller = new AbortController()
   const abortFromCaller = () => controller.abort()
   options.signal?.addEventListener('abort', abortFromCaller, { once: true })

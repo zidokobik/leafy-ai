@@ -11,25 +11,33 @@ Leafy is organized as one application with a Python service layer and a React us
 ├── main.py                 # FastAPI application entry point
 ├── backend/                # Python code and business logic
 │   ├── settings.py         # Application settings
-│   └── router/*            # API routers
+│   ├── db_models/*         # SQLModel tables
+│   ├── router/*            # API routers
+│   ├── schemas/*           # Request and response models
+│   └── services/*          # Reusable business logic
 ├── frontend/               # React + TypeScript dashboard
 │   ├── src/*
-│   ├── public/             # Static frontend assets
 │   └── vite.config.ts      # Vite development and build configuration
-└── sample-data/            # Local sample camera and sensor data
+└── sample-data/            # Static camera image served by the mock camera route
 ```
 
 ## Backend
 
 The Python code lives in `backend/`. This is the service layer and the home of application and farm-control business logic. The routers expose the REST endpoints consumed by the frontend and are registered by `main.py`.
 
+Routers stay thin: they wire up dependencies and shape responses. The work itself lives in `backend/services/`, where functions take a database session plus plain arguments. That keeps the same logic callable from the planned chat agent's tools without going through HTTP.
+
 ## Frontend
 
 The "frontend" refers to the React + TypeScript code in `frontend/`. It was previously managed separately in a different repository, but has been merged into this repository for easier development and deployment. Any changes should `cd` into the `frontend/` directory and run the frontend development server from there.
 
+The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview is the only page with real functionality today; it charts the sensor history over 24 hours, 7 days or 30 days using `recharts`. The rest are placeholders.
+
 ## Application Entry Point
 
 `main.py` is the application entry point. It creates the FastAPI app, registers the API routers, and configures the production serving behavior for the built frontend. During development, run the backend and Vite frontend as separate servers so both support reload and hot module replacement. Leafy's version 1 API is mounted under `/api/v1`, and the Vite development server forwards `/api` requests to FastAPI without rewriting the path.
+
+In production the built frontend is served by `SinglePageApp`, a `StaticFiles` subclass that falls back to `index.html` for unknown paths so client-side routes such as `/devices` still work on a page reload.
 
 The API conventions and current implementation status are documented in [`docs/api-v1.md`](docs/api-v1.md).
 
@@ -134,8 +142,10 @@ This question has been thought about and the decision to separate the project in
 
 # TODO
 
-### 1. "Connect" the frontend to the backend. The frontend was prevously a separate repository and was using mocked data. The frontend should be updated to use the backend API endpoints instead of mocked data.
+### 1. Build the Agents page. A chat agent that can answer questions about the farm using the sensor history. See the `chatbot-prototype` branch for reference. Its tools should call the functions in `backend/services/` directly rather than the HTTP API.
 
-### 2. Clean up the frontend code and remove any unused code (mocked data, unused components, etc.). This was previously done in the separate frontend repository, but some of the unused code was reintroduced when the frontend was merged into this repository.
+### 2. Build the Schedules page and its backend, covering lighting, irrigation and dosing schedules.
 
-### 3. Implement the chat bot into the front end. See the `chatbot-prototype` branch for reference.
+### 3. Build the Devices page on top of the camera and controller routers, and replace those mock implementations with real hardware calls.
+
+### 4. Drop the unused tables from `schema.sql`. Only `sensor_data` and `users` are modelled in `backend/db_models/` and used by the application.

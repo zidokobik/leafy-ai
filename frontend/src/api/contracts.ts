@@ -1,84 +1,27 @@
-import type { AlertDecision, ControlValues, MonitorRange } from '../types/dashboard'
+export type SensorRange = '24h' | '7d' | '30d'
 
-export type ApiConnectionState = 'demo' | 'loading' | 'connected' | 'error'
-
-export type ScheduleStateResponse = {
-  manualMode: boolean
-  recommendationApplied: boolean
-  controls: ControlValues
-  updatedAt: string
-}
-
-export type UpdateDeviceControlRequest = {
-  enabled?: boolean
-  duration?: number
-}
-
-export type UpdateManualModeRequest = {
-  enabled: boolean
-}
-
-export type UpdateRecommendationRequest = {
-  applied: boolean
-}
-
-export type AlertDecisionRequest = {
-  decision: AlertDecision
-}
-
-export type EcDoseSettings = {
-  targetEc: number
-  movingAverage: number
-  doseOnTime: number
-  mixingGuard: number
-  maxCycles: number
-}
-
-export type EcDoseLastEvent = {
-  type: 'dose_completed' | 'dose_blocked' | 'settings_updated' | 'none'
-  occurredAt: string | null
-  durationSeconds: number | null
-}
-
-export type EcDoseLiveData = {
-  movingAverageEc: number
-  validSamples: number
-  totalSamples: number
-  nextStartAt: string | null
-  lastEvent: EcDoseLastEvent
-  mixingGuardRemainingSeconds: number
-  updatedAt: string
-}
-
-export type EcDoseSnapshotResponse = {
-  settings: EcDoseSettings
-  live: EcDoseLiveData
-}
-
-export type MonitoringLatestResponse = {
-  healthScore: number
-  status: 'healthy' | 'attention'
-  temperatureC: number
-  humidityPercent: number
-  waterPh: number
-  nutrientEcMicrosiemens: number
-  updatedAt: string
-}
-
-export type MonitoringHistoryPoint = {
-  id: string
+/** A sensor sample. Every measurement is nullable because a reading can be missing a field. */
+export type SensorReading = {
   timestamp: string
-  waterPh: number
-  nutrientEcMicrosiemens: number
-  waterTemperatureC: number
-  temperatureC: number
-  humidityPercent: number
-  reservoirLevelCm: number
-  irrigationPumpOn: boolean
-  ecTargetMicrosiemens: number
+  waterPh: number | null
+  ecUsCm: number | null
+  waterTempC: number | null
+  ambientTempC: number | null
+  humidityPct: number | null
+  reservoirLevelCm: number | null
 }
 
-export type MonitoringHistoryResponse = {
-  range: MonitorRange
-  points: MonitoringHistoryPoint[]
+export type SensorHistory = {
+  range: SensorRange
+  start: string
+  end: string
+  bucketSeconds: number
+  readings: SensorReading[]
+}
+
+export type UserProfile = {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
 }

@@ -4,14 +4,18 @@
 
 This repository is a React 19 dashboard built with TypeScript and Vite.
 
-- `src/main.tsx` mounts the application.
-- `src/App.tsx` contains the primary UI component.
-- `src/*.css` holds global and component-level styles.
+- `src/main.tsx` mounts the application and loads the global stylesheets.
+- `src/App.tsx` gates the app on authentication, then declares the client-side routes.
+- `src/api/` holds the fetch wrapper, environment config, shared response types and the typed endpoint clients.
+- `src/components/` holds the shell (`AppShell`, `AppSidebar`, `Topbar`) and small shared pieces. `navigation.ts` is the single source of truth for the sidebar entries and page titles.
+- `src/features/<feature>/` holds one folder per feature, each containing its page component plus the hooks, child components and styles it owns.
+- `src/styles/` holds the global stylesheets: `base.css` (tokens and resets), `shell.css` (app shell) and `pages.css` (page and chart layout).
 - `src/assets/` stores images imported by TypeScript modules.
-- `public/` contains static files served from the site root.
 - `vite.config.ts` and `tsconfig*.json` define build and TypeScript behavior.
 
-Keep new components under `src/`, grouping related component, style, and test files in a clearly named directory as the application grows.
+Add a new page by creating a feature folder with its page component, registering the route in `src/App.tsx`, and adding the sidebar entry to `src/components/navigation.ts`.
+
+Routing is history based (`BrowserRouter`), so any production host must fall back to `index.html` for unknown paths. `main.py` already does this.
 
 ## Build, Test, and Development Commands
 
@@ -26,6 +30,10 @@ Run `npm run lint` and `npm run build` before submitting changes.
 ## Coding Style & Naming Conventions
 
 Use TypeScript and functional React components. Follow the existing style: two-space indentation, single quotes, no semicolons, and trailing commas where supported. Use `PascalCase` for components and component files, `camelCase` for variables and functions, and descriptive kebab-case names for CSS classes. Keep imports grouped at the top and remove unused declarations; TypeScript and ESLint enforce these rules.
+
+Data fetching lives in a hook next to the feature that needs it. Hooks own their own `AbortController`, clean up on unmount, and expose a `status` value rather than a bare boolean so loading, ready and error states stay distinct.
+
+API response fields are `camelCase` and measurements are nullable, matching `docs/api-v1.md`. Do not assume a measurement is present.
 
 ## Testing Guidelines
 

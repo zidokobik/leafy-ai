@@ -8,14 +8,14 @@ This document is the source of truth for Leafy's public HTTP API conventions and
 - The browser, Vite development proxy, and FastAPI use the same path. The proxy does not rewrite or remove `/api`.
 - FastAPI routes contain the real `/api/v1` prefix. `root_path` is reserved for a future deployment behind a reverse proxy and is not used by the current application.
 - During development, Vite forwards `/api` requests to `http://localhost:8000`.
-- Setting `VITE_API_BASE_URL=/` enables same-origin API requests through the Vite proxy. Leaving it empty keeps the frontend in demo mode.
+- `VITE_API_BASE_URL` is optional. Leave it empty (or set it to `/`) to send same-origin requests, which the Vite proxy forwards to FastAPI. Set an absolute URL only when the frontend is served from a different origin than the API.
 
 Example request flow:
 
 ```text
-Browser  GET /api/v1/water-sensor/readings
-Vite     GET /api/v1/water-sensor/readings
-FastAPI  GET /api/v1/water-sensor/readings
+Browser  GET /api/v1/sensors/history?range=24h
+Vite     GET /api/v1/sensors/history?range=24h
+FastAPI  GET /api/v1/sensors/history?range=24h
 ```
 
 ## Data conventions
@@ -23,7 +23,8 @@ FastAPI  GET /api/v1/water-sensor/readings
 - JSON fields exposed to the React frontend use `camelCase`.
 - Python identifiers use `snake_case` internally and map to the public JSON field names at the API boundary.
 - Timestamps use ISO 8601 in UTC, for example `2026-09-01T10:42:00Z`.
-- Unit-bearing numeric fields include the unit in the field name, for example `temperatureC`, `humidityPercent`, and `nutrientEcMicrosiemens`.
+- Unit-bearing numeric fields keep the unit suffix used by the database columns, for example `ambientTempC`, `humidityPct`, and `ecUsCm`.
+- Measurements are nullable. A reading can be missing individual fields, so clients must handle `null`.
 - FastAPI's standard error body is used unless a feature requires a more specific contract:
 
 ```json
@@ -43,9 +44,57 @@ FastAPI  GET /api/v1/water-sensor/readings
 
 Common errors use `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `422 Unprocessable Content`, and `500 Internal Server Error` as appropriate.
 
-## Implemented endpoints
+## Sensor endpoints
 
-The current backend implementations are mocks. They now share the `/api/v1` namespace, but their existing response bodies have not yet been migrated to the public camelCase conventions above.
+These are the only endpoints the dashboard currently calls. Both require a session cookie and read
+the Postgres `sensor_data` table through `backend/services/sensors.py`.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `GET` | `/api/v1/sensors/history?range={range}` | Readings for `24h`, `7d` or `30d`, averaged into buckets and ordered oldest first |
+| `GET` | `/api/v1/sensors/latest` | The most recent raw reading, or `404` when the table is empty |
+
+Sensors are polled every 30 seconds, so a raw 30 day range would be roughly 86,000 rows. `/history`
+averages each range into fixed buckets instead, which keeps a response near 200 points:
+
+| Range | Bucket | Approximate points |
+| --- | --- | --- |
+| `24h` | 5 minutes | 288 |
+| `7d` | 1 hour | 168 |
+| `30d` | 4 hours | 180 |
+
+`/history` returns the bucket size so clients do not have to infer it:
+
+```json
+{
+  "range": "24h",
+  "start": "2026-09-18T05:08:00Z",
+  "end": "2026-09-19T05:08:00Z",
+  "bucketSeconds": 300,
+  "readings": [
+    {
+      "timestamp": "2026-09-19T05:05:00Z",
+      "waterPh": 6.1,
+      "ecUsCm": 2648.75,
+      "waterTempC": 23.55,
+      "ambientTempC": 22.84,
+      "humidityPct": 54.33,
+      "reservoirLevelCm": 13.58
+    }
+  ]
+}
+```
+
+A bucketed reading is an average, so `/latest` is the endpoint to use for a current value.
+
+`backend/services/sensors.py` takes an `AsyncSession` plus plain arguments rather than FastAPI
+dependencies, so the planned chat agent can call the same functions as tools without going through
+HTTP.
+
+## Hardware endpoints
+
+These are still mock implementations that return hardcoded values. They are kept as the integration
+points for real hardware and are not yet used by the dashboard.
 
 | Method | Path | Current behavior |
 | --- | --- | --- |
@@ -62,27 +111,8 @@ The current backend implementations are mocks. They now share the `/api/v1` name
 | `PUT` | `/api/v1/controller/ph_doser?on={boolean}` | Returns the requested mock pH doser status |
 | `GET` | `/api/v1/controller/ec_doser` | Returns mock EC doser status |
 | `PUT` | `/api/v1/controller/ec_doser?on={boolean}` | Returns the requested mock EC doser status |
-| `GET` | `/api/v1/historical-data/` | Returns generic hardcoded historical records |
-| `POST` | `/api/v1/auth/login` | Verifies email/password and sets the session cookie |
-| `POST` | `/api/v1/auth/logout` | Clears the session cookie |
-| `GET` | `/api/v1/users/me` | Verifies the session cookie and returns the user's profile |
 
-## Reserved frontend contracts
-
-The typed frontend client already reserves the following v1 paths. They are part of the target contract but are not implemented by the current backend. Until each endpoint is implemented, the frontend must remain in demo mode or handle the unavailable endpoint explicitly.
-
-| Method | Path | Status |
-| --- | --- | --- |
-| `GET` | `/api/v1/schedule` | Not implemented |
-| `PUT` | `/api/v1/schedule/manual-mode` | Not implemented |
-| `POST` | `/api/v1/schedule/reset` | Not implemented |
-| `PUT` | `/api/v1/schedule/recommendation` | Not implemented |
-| `PATCH` | `/api/v1/devices/{device}` | Not implemented |
-| `PUT` | `/api/v1/alerts/ec/decision` | Not implemented |
-| `GET` | `/api/v1/ec-dose` | Not implemented |
-| `PUT` | `/api/v1/ec-dose/settings` | Not implemented |
-| `GET` | `/api/v1/monitoring/latest` | Reads the newest complete row from PostgreSQL `sensor_data` |
-| `GET` | `/api/v1/monitoring/history?range={range}` | Reads complete `sensor_data` rows from the selected time range (`24H`, `7D`, or `30D`) |
+Their response bodies have not been migrated to the camelCase conventions above.
 
 ## Authentication and account contracts
 
@@ -106,14 +136,16 @@ temporarily deploying without TLS.
 There is a single account tier: every signed-in user has full access. There are
 no per-user roles to manage.
 
-The current account endpoints are:
+The current session and account endpoints are:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/v1/users/me` | Implemented: read the authenticated user's profile |
-| `PATCH` | `/api/v1/users/me` | Implemented: update only firstName and lastName |
-| `PUT` | `/api/v1/users/me/password` | Implemented: change the authenticated user's password |
-| `DELETE` | `/api/v1/users/me` | Implemented: permanently delete the authenticated account |
+| `POST` | `/api/v1/auth/login` | Verify email and password, then set the session cookie |
+| `POST` | `/api/v1/auth/logout` | Clear the session cookie |
+| `GET` | `/api/v1/users/me` | Read the authenticated user's profile |
+| `PATCH` | `/api/v1/users/me` | Update only firstName and lastName |
+| `PUT` | `/api/v1/users/me/password` | Change the authenticated user's password |
+| `DELETE` | `/api/v1/users/me` | Permanently delete the authenticated account |
 
 ## Account settings
 

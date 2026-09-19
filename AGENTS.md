@@ -5,14 +5,16 @@
 This repository contains the complete Leafy application:
 
 - `main.py` is the FastAPI application entry point. It creates the app, registers the backend routers, and serves the built frontend in production.
-- `backend/` contains the Python service layer and business logic. `backend/settings.py` contains application settings, and `backend/router/` contains the API routers.
+- `backend/` contains the Python service layer and business logic. `backend/settings.py` contains application settings, `backend/router/` contains the API routers, `backend/schemas/` the request and response models, and `backend/services/` the reusable logic.
+- Keep routers thin. Put the actual work in `backend/services/`, where functions take an `AsyncSession` plus plain arguments rather than FastAPI dependencies, so the planned chat agent can call them as tools without going through HTTP.
 - `frontend/` contains the React and TypeScript dashboard. Its source is organized under `frontend/src/`, with API code, shared components, and feature-specific UI grouped by responsibility.
-- `sample-data/` contains local sample camera and sensor data.
+- `sample-data/` contains the static camera image served by the mock camera route.
 
-The frontend was previously maintained as a separate repository and is now part of this repository. Its existing organization is not completely uniform; follow the current feature-oriented structure for new work and avoid unrelated cleanup.
+The frontend uses client-side routing with one page per sidebar entry: Overview, Agents, Schedules and Devices. Only Overview is implemented; it charts sensor history over 24 hours, 7 days or 30 days. The others are placeholders. Adding a page means creating a feature folder, registering the route in `frontend/src/App.tsx`, and adding the entry to `frontend/src/components/navigation.ts`. Follow the conventions in `frontend/AGENTS.md` for frontend changes.
 
 ## Database Schema
 
+- Only `sensor_data` and `users` are modelled in `backend/db_models/` and used by the application. The remaining tables in `schema.sql` are currently unused and are planned for removal, so do not build on them without being asked.
 - `schema.sql` is the source of truth for the current Postgres schema, including defaults, primary keys, and foreign-key constraints. Read it before adding or changing database models, queries, migrations, or API contracts that persist data.
 - Database access is asynchronous through SQLAlchemy/SQLModel and `asyncpg`; use the existing database session dependency and model conventions in `backend/`.
 - The schema is organized into these domains:
@@ -34,7 +36,7 @@ The frontend was previously maintained as a separate repository and is now part 
 - Web framework: FastAPI
 - ASGI server: Uvicorn
 - Data validation/models: Pydantic v2
-- Frontend: React, TypeScript, and Vite
+- Frontend: React, TypeScript, and Vite, with `react-router-dom` for routing and `recharts` for charts
 
 ## uv Workflow
 

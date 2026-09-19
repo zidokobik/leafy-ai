@@ -21,27 +21,6 @@
   margin-bottom: 58px;
 }
 
-.auth-switch {
-  display: flex;
-  gap: 8px;
-  margin: 28px 0 24px;
-}
-
-.auth-switch button {
-  flex: 1;
-  padding: 12px;
-  border: 1px solid #c5cbbb;
-  border-radius: 10px;
-  background: transparent;
-  color: #505a48;
-  cursor: pointer;
-}
-
-.auth-switch button[aria-pressed="true"], .auth-submit {
-  background: #505f45;
-  color: white;
-}
-
 .auth-form { display: grid; gap: 12px; }
 .auth-form label { font-weight: 700; color: #343b32; }
 .auth-form input {
@@ -59,16 +38,18 @@
   padding: 14px 20px;
   border: 0;
   border-radius: 10px;
+  background: #505f45;
+  color: white;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
   margin-top: 12px;
 }
-.auth-form :focus-visible, .auth-switch :focus-visible, .auth-gate :focus-visible {
+.auth-form :focus-visible, .auth-gate :focus-visible {
   outline: 3px solid #b97d3f;
   outline-offset: 3px;
 }
-.auth-form :disabled, .auth-switch :disabled { opacity: .65; cursor: wait; }
+.auth-form :disabled { opacity: .65; cursor: wait; }
 .auth-error, .auth-message { padding: 14px; border-radius: 10px; line-height: 1.6; overflow-wrap: anywhere; }
 .auth-error { color: #8a2923; background: #fff0ed; }
 .auth-message { color: #34522a; background: #e6efdf; }
