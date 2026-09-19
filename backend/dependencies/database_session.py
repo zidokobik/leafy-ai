@@ -8,13 +8,13 @@ from ..settings import get_settings
 
 
 @lru_cache
-def _get_engine() -> AsyncEngine:
+def get_engine() -> AsyncEngine:
 	settings = get_settings()
 	return create_async_engine(settings.DATABASE_URI.get_secret_value())
 
 
 async def _async_database_session():
-	engine = _get_engine()
+	engine = get_engine()
 	async with AsyncSession(engine, expire_on_commit=False) as session:
 		yield session
 
