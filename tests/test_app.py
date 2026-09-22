@@ -1,30 +1,9 @@
-import os
-import sys
-from pathlib import Path
-
-# --- Auto-fix working directory and python path ---
-# This ensures Python can find the main backend modules correctly 
-# no matter where we run pytest from in our terminal.
-current_file = Path(__file__).resolve()
-project_root = current_file.parent.parent
-os.chdir(project_root)
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
-
-# Fix database URI settings for tests dynamically to use an in-memory SQLite DB
-# This keeps tests safe and self-contained without needing a real database file.
-import backend.settings
-settings = backend.settings.get_settings()
-if not settings.DATABASE_URI or settings.DATABASE_URI.get_secret_value() == "":
-    from pydantic import SecretStr
-    settings.DATABASE_URI = SecretStr("sqlite+aiosqlite:///:memory:")
-# ---------------------------------------------------------------------
-
 import pytest
 from httpx import ASGITransport, AsyncClient
-from main import app
-from unittest.mock import patch
 
+from main import app
+
+# TODO: Test authorized user, using credentials from environment variables
 
 # --- Root & Smoke Test ---
 @pytest.mark.asyncio
@@ -106,16 +85,14 @@ async def test_get_raw_camera_data():
 
 # --- Authentication & Protected Routes (Expect 401 Unauthorized) ---
 @pytest.mark.asyncio
-@patch("backend.router.auth.authenticate_user", return_value=None)
-async def test_login_unauthorized(mock_auth):
+async def test_login_unauthorized():
 	"""Ensure login fails with a 401 Unauthorized error when bad credentials are provided."""
 	async with AsyncClient(
 		transport=ASGITransport(app=app),
 		base_url="http://test",
 	) as client:
 		response = await client.post(
-			"/api/v1/auth/login", 
-			json={"email": "wrong@example.com", "password": "wrongpassword"}
+			"/api/v1/auth/login", json={"email": "wrong@example.com", "password": "wrongpassword"}
 		)
 	assert response.status_code == 401
 
