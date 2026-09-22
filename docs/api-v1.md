@@ -98,19 +98,7 @@ points for real hardware and are not yet used by the dashboard.
 
 | Method | Path | Current behavior |
 | --- | --- | --- |
-| `GET` | `/api/v1/water-sensor/readings` | Returns hardcoded water-sensor readings |
-| `GET` | `/api/v1/water-sensor/health` | Returns hardcoded sensor health |
 | `GET` | `/api/v1/camera/raw/{level}/{camera}` | Returns a static sample image |
-| `GET` | `/api/v1/controller/fan` | Returns mock fan status |
-| `PUT` | `/api/v1/controller/fan?on={boolean}` | Returns the requested mock fan status |
-| `GET` | `/api/v1/controller/lights` | Returns mock light status |
-| `PUT` | `/api/v1/controller/lights?on={boolean}` | Returns the requested mock light status |
-| `GET` | `/api/v1/controller/pump` | Returns mock pump status |
-| `PUT` | `/api/v1/controller/pump?on={boolean}` | Returns the requested mock pump status |
-| `GET` | `/api/v1/controller/ph_doser` | Returns mock pH doser status |
-| `PUT` | `/api/v1/controller/ph_doser?on={boolean}` | Returns the requested mock pH doser status |
-| `GET` | `/api/v1/controller/ec_doser` | Returns mock EC doser status |
-| `PUT` | `/api/v1/controller/ec_doser?on={boolean}` | Returns the requested mock EC doser status |
 
 Their response bodies have not been migrated to the camelCase conventions above.
 
