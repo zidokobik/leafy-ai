@@ -11,7 +11,11 @@ router = APIRouter(prefix="/chat", tags=["chat"], dependencies=[Depends(get_curr
 
 @router.post("", description="Stream a chat agent response for the given AI SDK UI message history.")
 async def chat(request: ChatRequest) -> StreamingResponse:
+
+	# Convert the `UIMessage` to `Message`
+	messages, approvals = ai.ui.ai_sdk.to_messages(request.messages)
+
 	return StreamingResponse(
-		stream_chat_response(request.messages),
+		stream_chat_response(messages, approvals),
 		headers=ai.ui.ai_sdk.UI_MESSAGE_STREAM_HEADERS,
 	)

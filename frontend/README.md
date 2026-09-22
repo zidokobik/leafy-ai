@@ -1,6 +1,6 @@
 # Leafy AI Dashboard
 
-A responsive React dashboard for monitoring a Sweet basil hydroponic farm and supporting AI-assisted growing workflows. The current dashboard focuses on authenticated access and sensor history; future pages will add agent chat, schedules and device controls.
+A responsive React dashboard for monitoring a Sweet basil hydroponic farm and supporting AI-assisted growing workflows. It provides authenticated access, sensor history, agent chat, and recurring agent schedule management; device controls remain planned.
 
 ## Commands
 
@@ -25,7 +25,7 @@ The frontend uses shadcn/ui with Tailwind CSS v4. The shadcn configuration lives
 Use shadcn primitives for common UI instead of custom component CSS:
 
 - App chrome: `Sidebar`, `DropdownMenu`, `Avatar`, `Separator`, `TooltipProvider`.
-- Forms and account settings: `Field`, `Input`, `Button`, `Alert`, `Dialog`.
+- Forms and account settings: `Field`, `Input`, `Textarea`, `Button`, `Alert`, `Dialog`.
 - Dashboard content: `Card`, `ToggleGroup`, `Skeleton`, `Empty`, and `Chart` wrappers around Recharts.
 
 Add shadcn components from the frontend directory:
@@ -77,11 +77,11 @@ src/
 ├── assets/              Imported images and static frontend assets
 ├── components/          App shell and shared shadcn/ui primitives
 ├── features/
-│   ├── agents/          Placeholder for the future farm agent chat
+│   ├── agents/          Interactive farm agent chat
 │   ├── auth/            Login, session state and account settings
 │   ├── devices/         Placeholder for device controls
 │   ├── overview/        Sensor history charts and range controls
-│   └── schedules/       Placeholder for grow schedules
+│   └── schedules/       Agent schedule management
 ├── hooks/               Shared React hooks used by shadcn components
 ├── lib/                 Shared utilities such as `cn`
 ├── styles/base.css      Tailwind imports, shadcn tokens and global theme

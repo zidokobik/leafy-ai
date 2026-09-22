@@ -66,3 +66,11 @@ CREATE TABLE public.sensor_data (
   reservoir_level_cm double precision,
   CONSTRAINT sensor_data_pkey PRIMARY KEY (timestamp_ms)
 );
+CREATE TABLE public.agent_scheduled_job (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  instruction text NOT NULL,
+  cron_expression text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  title text NOT NULL,
+  CONSTRAINT agent_scheduled_job_pkey PRIMARY KEY (id)
+);

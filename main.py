@@ -1,7 +1,7 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.staticfiles import StaticFiles
@@ -9,20 +9,18 @@ from starlette.types import Scope
 
 import backend.router.api
 import backend.settings
-from backend.schedule.poll_sensors import poll_sensors
+from backend.schedule import run_scheduler
 
 settings = backend.settings.get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	scheduler = AsyncIOScheduler()
-	scheduler.add_job(poll_sensors, "interval", seconds=30)
-	scheduler.start()
 
-	yield
+	logging.basicConfig(level=logging.INFO)
 
-	scheduler.shutdown(wait=False)
+	async with run_scheduler():
+		yield
 
 
 app = FastAPI(lifespan=lifespan)

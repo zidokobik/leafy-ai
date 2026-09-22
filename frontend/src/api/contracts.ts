@@ -25,3 +25,16 @@ export type UserProfile = {
   firstName: string | null
   lastName: string | null
 }
+
+export type AgentScheduledJob = {
+  id: string
+  title: string
+  instruction: string
+  cronExpression: string
+  createdAt: string
+}
+
+export type AgentScheduledJobWrite = Pick<
+  AgentScheduledJob,
+  'title' | 'instruction' | 'cronExpression'
+>

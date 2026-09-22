@@ -88,8 +88,38 @@ averages each range into fixed buckets instead, which keeps a response near 200 
 A bucketed reading is an average, so `/latest` is the endpoint to use for a current value.
 
 `backend/services/sensors.py` takes an `AsyncSession` plus plain arguments rather than FastAPI
-dependencies, so the planned chat agent can call the same functions as tools without going through
-HTTP.
+dependencies, so agent tools can call the same functions without going through HTTP.
+
+## Scheduled agent jobs
+
+Scheduled agent jobs require a session cookie and persist a title, agent instruction, and standard
+five-field cron expression. A successful create request registers the job with the running
+APScheduler instance immediately; startup also restores every persisted job.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `GET` | `/api/v1/schedules` | List scheduled agent jobs, newest first |
+| `POST` | `/api/v1/schedules` | Create and immediately register a scheduled agent job; returns `201 Created` |
+| `PATCH` | `/api/v1/schedules/{jobId}` | Update a scheduled job's title, instruction, and cron expression, replacing its running scheduler registration |
+| `DELETE` | `/api/v1/schedules/{jobId}` | Remove a scheduled job from persistence and the running scheduler; returns `204 No Content` |
+
+`POST /api/v1/schedules` accepts the following body:
+
+```json
+{
+  "title": "Morning farm report",
+  "instruction": "Report the current system status.",
+  "cronExpression": "0 6 * * *"
+}
+```
+
+`title`, `instruction`, and `cronExpression` must not be blank. `cronExpression` must be a valid
+five-field crontab expression. Invalid values return `422 Unprocessable Content`.
+
+`PATCH /api/v1/schedules/{jobId}` accepts
+`{ "title": "...", "instruction": "...", "cronExpression": "..." }`. All values are required
+and use the same validation as creation. A successful update takes effect immediately in the
+running scheduler.
 
 ## Hardware endpoints
 
