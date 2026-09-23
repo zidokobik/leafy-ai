@@ -1,9 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   CalendarClockIcon,
   CircleAlertIcon,
+  CircleCheckIcon,
   CircleHelpIcon,
+  CircleXIcon,
   FileTextIcon,
+  LoaderCircleIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -50,6 +53,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useScheduledJobs } from './useScheduledJobs'
+import { mockScheduleRun } from './mockScheduleRun'
 
 const emptyForm: AgentScheduledJobWrite = {
   title: '',
@@ -62,9 +66,99 @@ const createdAtFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 })
 
+const exactTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'medium',
+})
+
 function formatCreatedAt(createdAt: string) {
   const date = new Date(createdAt)
   return Number.isNaN(date.getTime()) ? 'Unknown' : createdAtFormatter.format(date)
+}
+
+function formatExactTime(value: string | null) {
+  if (!value) return 'Not available'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Unknown' : exactTimeFormatter.format(date)
+}
+
+function formatDuration(durationMs: number) {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000))
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
+function formatNextRun(nextRunAt: string | null, now: number) {
+  if (!nextRunAt) return 'Not scheduled'
+  const nextRun = new Date(nextRunAt)
+  if (Number.isNaN(nextRun.getTime())) return 'Unknown'
+  const remaining = nextRun.getTime() - now
+  return remaining <= 0 ? 'Starting now' : `in ${formatDuration(remaining)}`
+}
+
+function ScheduleRunSummary({ job: schedule, now }: { job: AgentScheduledJob, now: number }) {
+  const [referenceTime] = useState(() => Date.now())
+  const job = { ...schedule, ...mockScheduleRun('never_run', referenceTime) }
+  const runningFor = job.lastStartedAt
+    ? formatDuration(now - new Date(job.lastStartedAt).getTime())
+    : '0s'
+
+  return (
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Status</span>
+        {job.lastStatus === 'running' && (
+          <Badge variant="secondary"><LoaderCircleIcon data-icon="inline-start" />Running</Badge>
+        )}
+        {job.lastStatus === 'succeeded' && (
+          <Badge><CircleCheckIcon data-icon="inline-start" />Succeeded</Badge>
+        )}
+        {job.lastStatus === 'failed' && (
+          <Badge variant="destructive"><CircleXIcon data-icon="inline-start" />Failed</Badge>
+        )}
+        {job.lastStatus === 'never_run' && <Badge>Waiting</Badge>}
+        {job.lastStatus === 'running' && (
+          <span className="text-sm text-muted-foreground">Running for {runningFor}</span>
+        )}
+      </div>
+
+      {job.lastStatus === 'running' && (
+        <Skeleton
+          className="h-2 w-full"
+          role="progressbar"
+          aria-label={`${job.title} is running`}
+          aria-valuetext={`Running for ${runningFor}`}
+        />
+      )}
+
+      <dl className="grid w-full gap-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-muted-foreground">Last completed</dt>
+          <dd className="font-medium">{job.lastCompletedAt ? formatExactTime(job.lastCompletedAt) : 'Not completed yet'}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Next run</dt>
+          <dd className="font-medium">{formatNextRun(job.nextRunAt, now)}</dd>
+          {job.nextRunAt && <dd className="text-muted-foreground">{formatExactTime(job.nextRunAt)}</dd>}
+        </div>
+      </dl>
+
+      {job.lastStatus === 'failed' && job.lastError && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>Last run failed</AlertTitle>
+          <AlertDescription>{job.lastError}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  )
 }
 
 function errorMessage(cause: unknown, fallback: string) {
@@ -76,6 +170,7 @@ function errorMessage(cause: unknown, fallback: string) {
 
 export function SchedulesPage() {
   const { jobs, status, error, create, update: updateJob, remove } = useScheduledJobs()
+  const [now, setNow] = useState(() => Date.now())
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [formError, setFormError] = useState('')
@@ -88,6 +183,11 @@ export function SchedulesPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [jobToDelete, setJobToDelete] = useState<AgentScheduledJob | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   function openCreateDialog() {
     setFormError('')
@@ -261,6 +361,7 @@ export function SchedulesPage() {
                   <p className="line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                     {job.instruction}
                   </p>
+                  <ScheduleRunSummary job={job} now={now} />
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={() => setJobToInspect(job)}>
                       <FileTextIcon data-icon="inline-start" />
