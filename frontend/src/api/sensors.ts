@@ -1,9 +1,9 @@
 import { apiRequest } from './client'
-import type { SensorHistory, SensorRange, SensorReading } from './contracts'
+import type { SensorHistory, SensorReading } from './contracts'
 
 export const sensorsApi = {
-  getHistory: (range: SensorRange, signal?: AbortSignal) => (
-    apiRequest<SensorHistory>(`/api/v1/sensors/history?range=${range}`, { signal })
+  getHistory: (before: string, end: string, signal?: AbortSignal) => (
+    apiRequest<SensorHistory>(`/api/v1/sensors/history?${new URLSearchParams({ before, end })}`, { signal })
   ),
 
   getLatest: (signal?: AbortSignal) => (

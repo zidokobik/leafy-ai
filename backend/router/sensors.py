@@ -1,10 +1,11 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from backend.dependencies.auth import get_current_auth_user
 from backend.dependencies.database_session import AsyncDatabaseSession
-from backend.schemas.sensors import SensorHistory, SensorRange, SensorReading
+from backend.schemas.sensors import SensorHistory, SensorReading
 from backend.services import sensors as sensor_service
 
 router = APIRouter(
@@ -17,15 +18,19 @@ router = APIRouter(
 @router.get(
 	"/history",
 	description="""
-	Sensor readings for the requested range, averaged into fixed buckets and ordered oldest first.
-	Buckets are 5 minutes for `24h`, 1 hour for `7d` and 4 hours for `30d`.
+		Sensor readings for the inclusive `before` to `end` interval, averaged into adaptive buckets and
+		ordered oldest first.
 	""",
 )
 async def read_sensor_history(
 	session: AsyncDatabaseSession,
-	sensor_range: Annotated[SensorRange, Query(alias="range")] = "24h",
+	before: Annotated[datetime, Query(description="Inclusive UTC interval start.")],
+	end: Annotated[datetime, Query(description="Inclusive UTC interval end.")],
 ) -> SensorHistory:
-	return await sensor_service.get_history(session, sensor_range)
+	try:
+		return await sensor_service.get_history(session, before, end)
+	except ValueError as error:
+		raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
 
 
 @router.get("/latest", description="The most recent raw sensor reading.")

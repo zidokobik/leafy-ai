@@ -1,5 +1,3 @@
-export type SensorRange = '24h' | '7d' | '30d'
-
 /** A sensor sample. Every measurement is nullable because a reading can be missing a field. */
 export type SensorReading = {
   timestamp: string
@@ -12,8 +10,7 @@ export type SensorReading = {
 }
 
 export type SensorHistory = {
-  range: SensorRange
-  start: string
+  before: string
   end: string
   bucketSeconds: number
   readings: SensorReading[]

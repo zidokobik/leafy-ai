@@ -13,9 +13,9 @@ This document is the source of truth for Leafy's public HTTP API conventions and
 Example request flow:
 
 ```text
-Browser  GET /api/v1/sensors/history?range=24h
-Vite     GET /api/v1/sensors/history?range=24h
-FastAPI  GET /api/v1/sensors/history?range=24h
+Browser  GET /api/v1/sensors/history?before=2026-09-18T05%3A08%3A00Z&end=2026-09-19T05%3A08%3A00Z
+Vite     GET /api/v1/sensors/history?before=2026-09-18T05%3A08%3A00Z&end=2026-09-19T05%3A08%3A00Z
+FastAPI  GET /api/v1/sensors/history?before=2026-09-18T05%3A08%3A00Z&end=2026-09-19T05%3A08%3A00Z
 ```
 
 ## Data conventions
@@ -51,24 +51,21 @@ the Postgres `sensor_data` table through `backend/services/sensors.py`.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| `GET` | `/api/v1/sensors/history?range={range}` | Readings for `24h`, `7d` or `30d`, averaged into buckets and ordered oldest first |
+| `GET` | `/api/v1/sensors/history?before={ISO 8601}&end={ISO 8601}` | Readings in the inclusive interval, averaged into adaptive buckets and ordered oldest first |
 | `GET` | `/api/v1/sensors/latest` | The most recent raw reading, or `404` when the table is empty |
 
-Sensors are polled every 30 seconds, so a raw 30 day range would be roughly 86,000 rows. `/history`
-averages each range into fixed buckets instead, which keeps a response near 200 points:
+`before` and `end` are required UTC ISO 8601 timestamps. `before` must be earlier than `end`; an
+invalid interval returns `422 Unprocessable Content`. Both bounds are inclusive.
 
-| Range | Bucket | Approximate points |
-| --- | --- | --- |
-| `24h` | 5 minutes | 288 |
-| `7d` | 1 hour | 168 |
-| `30d` | 4 hours | 180 |
+Sensors are polled every 30 seconds, so a raw long interval can contain tens of thousands of rows.
+`/history` selects the smallest standard bucket that targets at most about 200 points. Available
+bucket sizes range from one minute to one day; the selected size is included in each response.
 
 `/history` returns the bucket size so clients do not have to infer it:
 
 ```json
 {
-  "range": "24h",
-  "start": "2026-09-18T05:08:00Z",
+  "before": "2026-09-18T05:08:00Z",
   "end": "2026-09-19T05:08:00Z",
   "bucketSeconds": 300,
   "readings": [

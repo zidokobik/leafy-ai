@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.db_models.sensor_data import SensorData
-from backend.schemas.sensors import SensorHistory, SensorRange, SensorReading
+from backend.schemas.sensors import SensorHistory, SensorReading
 
 MEASUREMENTS = (
 	"water_ph",
@@ -22,20 +22,21 @@ MEASUREMENTS = (
 	"reservoir_level_cm",
 )
 
-RANGE_WINDOWS: dict[SensorRange, timedelta] = {
-	"24h": timedelta(hours=24),
-	"7d": timedelta(days=7),
-	"30d": timedelta(days=30),
-}
-
-# Sensors are polled every 30 seconds, so a raw 30 day range is ~86k rows. Averaging each range
-# into buckets keeps a response around 200 points, which is enough resolution for a chart and
-# small enough to fit in an agent's context.
-RANGE_BUCKETS: dict[SensorRange, timedelta] = {
-	"24h": timedelta(minutes=5),
-	"7d": timedelta(hours=1),
-	"30d": timedelta(hours=4),
-}
+# Sensors are polled every 30 seconds. Select the smallest standard bucket that keeps an interval
+# to roughly 200 chart points, avoiding an unbounded payload for arbitrary date selections.
+MAX_HISTORY_BUCKETS = 200
+BUCKET_OPTIONS = (
+	timedelta(minutes=1),
+	timedelta(minutes=5),
+	timedelta(minutes=15),
+	timedelta(minutes=30),
+	timedelta(hours=1),
+	timedelta(hours=2),
+	timedelta(hours=4),
+	timedelta(hours=8),
+	timedelta(hours=12),
+	timedelta(days=1),
+)
 
 
 def _to_ms(moment: datetime) -> int:
@@ -46,16 +47,25 @@ def _to_datetime(timestamp_ms: int) -> datetime:
 	return datetime.fromtimestamp(timestamp_ms / 1000, UTC)
 
 
+def _select_bucket(before: datetime, end: datetime) -> timedelta:
+	minimum_seconds = (end - before).total_seconds() / MAX_HISTORY_BUCKETS
+	return next(
+		(bucket for bucket in BUCKET_OPTIONS if bucket.total_seconds() >= minimum_seconds),
+		BUCKET_OPTIONS[-1],
+	)
+
+
 async def get_history(
 	session: AsyncSession,
-	sensor_range: SensorRange,
-	now: datetime | None = None,
+	before: datetime,
+	end: datetime,
 ) -> SensorHistory:
-	"""Average the readings of `sensor_range` into fixed buckets, oldest first."""
+	"""Average the inclusive [`before`, `end`] interval into buckets, oldest first."""
 
-	end = now or datetime.now(UTC)
-	start = end - RANGE_WINDOWS[sensor_range]
-	bucket = RANGE_BUCKETS[sensor_range]
+	if before >= end:
+		raise ValueError("before must be earlier than end")
+
+	bucket = _select_bucket(before, end)
 	bucket_ms = int(bucket.total_seconds() * 1000)
 
 	bucket_start = (SensorData.timestamp_ms // bucket_ms) * bucket_ms
@@ -64,15 +74,14 @@ async def get_history(
 			bucket_start.label("bucket_start"),
 			*(sa.func.avg(getattr(SensorData, name)).label(name) for name in MEASUREMENTS),
 		)
-		.where(SensorData.timestamp_ms >= _to_ms(start), SensorData.timestamp_ms <= _to_ms(end))
+		.where(SensorData.timestamp_ms >= _to_ms(before), SensorData.timestamp_ms <= _to_ms(end))
 		.group_by(bucket_start)
 		.order_by(bucket_start)
 	)
 	rows = (await session.execute(statement)).all()
 
 	return SensorHistory(
-		range=sensor_range,
-		start=start,
+		before=before,
 		end=end,
 		bucket_seconds=int(bucket.total_seconds()),
 		readings=[

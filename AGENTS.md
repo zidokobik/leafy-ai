@@ -10,7 +10,7 @@ This repository contains the complete Leafy application:
 - `frontend/` contains the React and TypeScript dashboard. Its source is organized under `frontend/src/`, with API code, shared shell components, shadcn/ui primitives, and feature-specific UI grouped by responsibility.
 - `sample-data/` contains the static camera image served by the mock camera route.
 
-The frontend uses client-side routing with one page per sidebar entry: Overview, Agents, Schedules and Devices. Only Overview is implemented; it charts sensor history over 24 hours, 7 days or 30 days using Recharts via shadcn chart components. The others are placeholders. Adding a page means creating a feature folder, registering the route in `frontend/src/App.tsx`, and adding the entry to `frontend/src/components/navigation.ts`. Follow the conventions in `frontend/AGENTS.md` for frontend changes.
+The frontend uses client-side routing with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview charts sensor history for a selected `before` to `end` interval using Recharts via shadcn chart components; Agents provides the interactive agent chat; and Schedules manages recurring agent instructions. Devices is a placeholder. Adding a page means creating a feature folder, registering the route in `frontend/src/App.tsx`, and adding the entry to `frontend/src/components/navigation.ts`. Follow the conventions in `frontend/AGENTS.md` for frontend changes.
 
 ## Database Schema
 

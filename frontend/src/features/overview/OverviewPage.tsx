@@ -1,26 +1,44 @@
 import { useState } from 'react'
-import type { SensorRange } from '../../api/contracts'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SensorChart } from './SensorChart'
 import { sensorMetrics } from './sensorMetrics'
 import { useSensorData } from './useSensorData'
 
-const ranges: { value: SensorRange; label: string }[] = [
-  { value: '24h', label: '24 hours' },
-  { value: '7d', label: '7 days' },
-  { value: '30d', label: '30 days' },
-]
-
 const readingTime = new Intl.DateTimeFormat(undefined, {
   day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
 })
 
+const presets = [
+  { value: '24h', label: '24 hours', milliseconds: 24 * 60 * 60 * 1000 },
+  { value: '7d', label: '7 days', milliseconds: 7 * 24 * 60 * 60 * 1000 },
+  { value: '30d', label: '30 days', milliseconds: 30 * 24 * 60 * 60 * 1000 },
+] as const
+
+function toDateTimeLocal(date: Date) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
+}
+
 export function OverviewPage() {
-  const [range, setRange] = useState<SensorRange>('24h')
-  const { history, latest, status, error } = useSensorData(range)
+  const [end, setEnd] = useState(() => new Date())
+  const [before, setBefore] = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000))
+  const [preset, setPreset] = useState<(typeof presets)[number]['value'] | ''>('24h')
+  const { history, latest, status, error } = useSensorData(before, end)
+
+  function selectPreset(value: string) {
+    const selected = presets.find((item) => item.value === value)
+    if (!selected) return
+
+    const currentEnd = new Date()
+    setEnd(currentEnd)
+    setBefore(new Date(currentEnd.getTime() - selected.milliseconds))
+    setPreset(selected.value)
+  }
 
   return (
     <section className="flex flex-col gap-5">
@@ -33,24 +51,49 @@ export function OverviewPage() {
               : 'No readings recorded yet.'}
           </p>
         </div>
-        <div className="max-w-full overflow-x-auto pb-1">
+        <div className="grid w-full gap-3 sm:w-auto">
           <ToggleGroup
             type="single"
             variant="outline"
-            value={range}
-            onValueChange={(value) => { if (value) setRange(value as SensorRange) }}
-            aria-label="Sensor time range"
+            size="sm"
+            value={preset}
+            onValueChange={selectPreset}
+            aria-label="Sensor interval presets"
           >
-            {ranges.map(({ value, label }) => (
-              <ToggleGroupItem
-                key={value}
-                value={value}
-                aria-label={label}
-              >
+            {presets.map(({ value, label }) => (
+              <ToggleGroupItem key={value} value={value} aria-label={label}>
                 {label}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
+          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="sensor-before">From</Label>
+            <Input
+              id="sensor-before"
+              type="datetime-local"
+              value={toDateTimeLocal(before)}
+              max={toDateTimeLocal(end)}
+              onChange={(event) => {
+                setBefore(new Date(event.target.value))
+                setPreset('')
+              }}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sensor-end">To</Label>
+            <Input
+              id="sensor-end"
+              type="datetime-local"
+              value={toDateTimeLocal(end)}
+              min={toDateTimeLocal(before)}
+              onChange={(event) => {
+                setEnd(new Date(event.target.value))
+                setPreset('')
+              }}
+            />
+          </div>
+          </div>
         </div>
       </header>
 
@@ -81,7 +124,8 @@ export function OverviewPage() {
               key={metric.key}
               metric={metric}
               readings={history.readings}
-              range={range}
+              before={history.before}
+              end={history.end}
               current={latest?.[metric.key] ?? null}
             />
           ))}

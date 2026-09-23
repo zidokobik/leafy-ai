@@ -1,16 +1,10 @@
 import { useMemo } from 'react'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import type { SensorRange, SensorReading } from '../../api/contracts'
+import type { SensorReading } from '../../api/contracts'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { buildAxis, formatMetricValue, type SensorMetric } from './sensorMetrics'
-
-const axisTimeFormats: Record<SensorRange, Intl.DateTimeFormatOptions> = {
-  '24h': { hour: '2-digit', minute: '2-digit' },
-  '7d': { weekday: 'short', hour: '2-digit' },
-  '30d': { day: 'numeric', month: 'short' },
-}
 
 const tooltipTimeFormat: Intl.DateTimeFormatOptions = {
   day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -19,13 +13,22 @@ const tooltipTimeFormat: Intl.DateTimeFormatOptions = {
 type SensorChartProps = {
   metric: SensorMetric
   readings: SensorReading[]
-  range: SensorRange
+  before: string
+  end: string
   current: number | null
 }
 
-export function SensorChart({ metric, readings, range, current }: SensorChartProps) {
+export function SensorChart({ metric, readings, before, end, current }: SensorChartProps) {
   // Timestamps are rendered in the browser's own timezone.
-  const axisTime = useMemo(() => new Intl.DateTimeFormat(undefined, axisTimeFormats[range]), [range])
+  const axisTime = useMemo(() => {
+    const duration = Date.parse(end) - Date.parse(before)
+    const options: Intl.DateTimeFormatOptions = duration <= 2 * 24 * 60 * 60 * 1000
+      ? { hour: '2-digit', minute: '2-digit' }
+      : duration <= 14 * 24 * 60 * 60 * 1000
+        ? { weekday: 'short', hour: '2-digit' }
+        : { day: 'numeric', month: 'short' }
+    return new Intl.DateTimeFormat(undefined, options)
+  }, [before, end])
   const tooltipTime = useMemo(() => new Intl.DateTimeFormat(undefined, tooltipTimeFormat), [])
 
   const data = useMemo(

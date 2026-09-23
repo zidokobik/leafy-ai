@@ -1,10 +1,7 @@
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
-
-SensorRange = Literal["24h", "7d", "30d"]
 
 
 class SensorReading(BaseModel):
@@ -24,8 +21,7 @@ class SensorReading(BaseModel):
 class SensorHistory(BaseModel):
 	model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-	range: SensorRange
-	start: datetime
+	before: datetime
 	end: datetime
 	bucket_seconds: int
 	readings: list[SensorReading]

@@ -32,7 +32,7 @@ Routers stay thin: they wire up dependencies and shape responses. The work itsel
 
 The "frontend" refers to the React + TypeScript code in `frontend/`. It was previously managed separately in a different repository, but has been merged into this repository for easier development and deployment. Any changes should `cd` into the `frontend/` directory and run the frontend development server from there.
 
-The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview is the only page with real functionality today; it charts the sensor history over 24 hours, 7 days or 30 days using `recharts` through shadcn chart components. The rest are placeholders.
+The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview charts sensor history for a requested `before` to `end` interval using `recharts` through shadcn chart components. Agents provides chat, and Schedules lists, creates and deletes recurring agent jobs. Devices is currently a placeholder.
 
 The frontend UI is built with shadcn/ui source components, Tailwind CSS v4, and a basil-green theme defined in `frontend/src/styles/base.css`. Shared primitives live in `frontend/src/components/ui/`; compose those before adding custom markup or feature-local CSS.
 
@@ -145,10 +145,4 @@ This question has been thought about and the decision to separate the project in
 
 # TODO
 
-### 1. Build the Agents page. A chat agent that can answer questions about the farm using the sensor history. See the `chatbot-prototype` branch for reference. Its tools should call the functions in `backend/services/` directly rather than the HTTP API.
-
-### 2. Build the Schedules page and its backend, covering lighting, irrigation and dosing schedules.
-
-### 3. Build the Devices page on top of the camera and controller routers, and replace those mock implementations with real hardware calls.
-
-### 4. Drop the unused tables from `schema.sql`. Only `sensor_data` and `users` are modelled in `backend/db_models/` and used by the application.
+1. Expand Agent tools
