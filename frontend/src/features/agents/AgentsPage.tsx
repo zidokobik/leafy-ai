@@ -1,16 +1,26 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { BotIcon, SendHorizonalIcon } from "lucide-react";
+import { DefaultChatTransport, isToolUIPart } from "ai";
+import {
+  BotIcon,
+  RefreshCwIcon,
+  SendHorizonalIcon,
+  SquareIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { apiConfig } from "../../api/config";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Markdown } from "@/components/ui/markdown";
 import {
   Message,
   MessageAvatar,
@@ -24,8 +34,11 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { AssistantParts } from "./MessageParts";
 
-const suggestions = ["What is the water pH level?"];
+const suggestions = [
+  "Summarize the latest 24 hours sensor data"
+];
 
 const transport = new DefaultChatTransport({
   api: `${apiConfig.baseUrl}/api/v1/chat`,
@@ -34,8 +47,24 @@ const transport = new DefaultChatTransport({
 
 export function AgentsPage() {
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status, error } = useChat({ transport });
-  const isBusy = status !== "ready" && status !== "error";
+  const { messages, sendMessage, status, error, stop, regenerate } = useChat({
+    transport,
+  });
+  const isBusy = status === "submitted" || status === "streaming";
+
+  // Keep the thinking indicator up until the response streams something visible.
+  const lastMessage = messages.at(-1);
+  const showThinking =
+    isBusy &&
+    !(
+      lastMessage?.role === "assistant" &&
+      lastMessage.parts.some(
+        (part) =>
+          (part.type === "text" && part.text.length > 0) ||
+          part.type === "reasoning" ||
+          isToolUIPart(part),
+      )
+    );
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -50,8 +79,8 @@ export function AgentsPage() {
       <header>
         <h1 className="text-2xl font-medium tracking-tight">Agent</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ask the Leafy agent about your farm. It cannot read sensors or control
-          equipment yet.
+          Ask the Leafy agent about your farm. It can look up sensor history to
+          answer questions about the hydroponic system.
         </p>
       </header>
 
@@ -81,7 +110,8 @@ export function AgentsPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setInput(suggestion)}
+                          disabled={isBusy}
+                          onClick={() => void sendMessage({ text: suggestion })}
                         >
                           {suggestion}
                         </Button>
@@ -110,29 +140,26 @@ export function AgentsPage() {
                           </Avatar>
                         </MessageAvatar>
                         <MessageContent>
-                          <Bubble
-                            align={message.role === "user" ? "end" : "start"}
-                            variant={
-                              message.role === "user" ? "default" : "muted"
-                            }
-                          >
-                            <BubbleContent>
-                              {message.parts.map((part, index) =>
-                                part.type === "text" ? (
-                                  <Markdown key={`${message.id}-${index}`}>
-                                    {part.text}
-                                  </Markdown>
-                                ) : null,
-                              )}
-                            </BubbleContent>
-                          </Bubble>
+                          {message.role === "user" ? (
+                            <Bubble align="end">
+                              <BubbleContent>
+                                {message.parts
+                                  .map((part) =>
+                                    part.type === "text" ? part.text : "",
+                                  )
+                                  .join("")}
+                              </BubbleContent>
+                            </Bubble>
+                          ) : (
+                            <AssistantParts message={message} />
+                          )}
                         </MessageContent>
                       </Message>
                     </MessageScrollerItem>
                   ))
                 )}
 
-                {status === "submitted" && (
+                {showThinking && (
                   <Message align="start">
                     <MessageAvatar>
                       <Avatar size="sm">
@@ -143,8 +170,8 @@ export function AgentsPage() {
                     </MessageAvatar>
                     <MessageContent>
                       <Bubble variant="muted">
-                        <BubbleContent className="shimmer">
-                          Thinking…
+                        <BubbleContent>
+                          <span className="shimmer">Thinking…</span>
                         </BubbleContent>
                       </Bubble>
                     </MessageContent>
@@ -158,7 +185,21 @@ export function AgentsPage() {
 
         {error && (
           <Alert variant="destructive" className="mx-4 mb-2 shrink-0">
-            <AlertDescription>{error.message}</AlertDescription>
+            <TriangleAlertIcon />
+            <AlertTitle>The agent could not respond</AlertTitle>
+            <AlertDescription>
+              {error.message || "Something went wrong."}
+            </AlertDescription>
+            <AlertAction>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void regenerate()}
+              >
+                <RefreshCwIcon /> Retry
+              </Button>
+            </AlertAction>
           </Alert>
         )}
 
@@ -172,14 +213,26 @@ export function AgentsPage() {
             placeholder="Ask about your farm..."
             autoComplete="off"
           />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!input.trim() || isBusy}
-            aria-label="Send message"
-          >
-            <SendHorizonalIcon />
-          </Button>
+          {isBusy ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={() => void stop()}
+              aria-label="Stop response"
+            >
+              <SquareIcon />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim()}
+              aria-label="Send message"
+            >
+              <SendHorizonalIcon />
+            </Button>
+          )}
         </form>
       </Card>
     </section>

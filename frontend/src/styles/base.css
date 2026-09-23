@@ -184,3 +184,23 @@ a {
     @apply font-sans;
   }
 }
+
+/* Animated highlight sweep for in-progress text, e.g. "Thinking…" */
+@utility shimmer {
+  background: linear-gradient(
+      90deg,
+      var(--color-muted-foreground) 40%,
+      var(--color-foreground) 50%,
+      var(--color-muted-foreground) 60%
+    )
+    0 0 / 200% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-sweep 2s linear infinite;
+}
+
+@keyframes shimmer-sweep {
+  to {
+    background-position: -200% 0;
+  }
+}
