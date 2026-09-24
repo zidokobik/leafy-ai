@@ -212,15 +212,15 @@ export function LogsPage() {
       </div>
 
       {/* Controls: Search & Filters */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+      <div className="flex flex-col justify-between items-start gap-4 mb-8">
+        <div className="flex flex-wrap items-start gap-2 w-full lg:w-auto">
           {FILTERS.map((f) => (
             <button
               key={f}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm ${
                 activeFilter === f
-                  ? "bg-gray-900 text-black order border border-black-200 dark:bg-white dark:text-gray-900"
-                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-400 dark:hover:bg-gray-800"
+                  ? "bg-white-900 text-black order border border-black"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
               }`}
               onClick={() => setActiveFilter(f)}
             >
@@ -259,7 +259,7 @@ export function LogsPage() {
           return (
             <div
               key={entry.id}
-              className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm border-l-4 ${style.border}`}
+              className={`bg-white rounded-xl overflow-hidden shadow-sm border-l-4 ${style.border}`}
             >
               <div
                 className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
