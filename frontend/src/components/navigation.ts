@@ -1,4 +1,4 @@
-import { BotIcon, CalendarDaysIcon, LayoutDashboardIcon, SproutIcon } from 'lucide-react'
+import { BotIcon, CalendarDaysIcon, LayoutDashboardIcon, SproutIcon, Logs } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {
@@ -12,6 +12,7 @@ export const navItems: NavItem[] = [
   { to: '/agents', icon: BotIcon, label: 'Agents' },
   { to: '/schedules', icon: CalendarDaysIcon, label: 'Schedules' },
   { to: '/devices', icon: SproutIcon, label: 'Devices' },
+  {to : '/logs', icon:Logs, label: 'Logs' },
 ]
 
 export function pageTitle(pathname: string) {
