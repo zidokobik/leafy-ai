@@ -9,6 +9,7 @@ import { useAuth } from './features/auth/useAuth'
 import { DevicesPage } from './features/devices/DevicesPage'
 import { OverviewPage } from './features/overview/OverviewPage'
 import { SchedulesPage } from './features/schedules/SchedulesPage'
+import {LogsPage} from './features/logs/LogsPage'
 
 export default function App() {
   const auth = useAuth()
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="agents" element={<AgentsPage />} />
           <Route path="schedules" element={<SchedulesPage />} />
           <Route path="devices" element={<DevicesPage />} />
+          <Route path="logs" element={<LogsPage/>}/>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
