@@ -1,4 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { safetyApi } from "@/api/safety";
+import { safetyError, useSafetyList } from "../safety/useSafetyList";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Droplets,
   Sun,
@@ -10,98 +14,6 @@ import {
   ChevronDown,
   Search,
 } from "lucide-react";
-
-// --- Mock Data ---
-const MOCK_LOG = [
-  {
-    id: 1,
-    timestamp: "Today, 14:32",
-    level: "alert",
-    category: "Dosing",
-    title: "EC levels above safe range",
-    reasoning:
-      "EC readings rose across three consecutive samples (18 minutes apart), ruling out a single sensor glitch. This trend crossed the upper bound of the approved operating range for current-stage basil, so automatic dosing was paused rather than issued, since dosing is a medium-risk action requiring trend confirmation and human sign-off.",
-    status: "Pending review",
-    sensor: "EC 2.6 mS/cm (limit 2.2 mS/cm)",
-  },
-  {
-    id: 2,
-    timestamp: "Today, 13:05",
-    level: "action",
-    category: "Lighting",
-    title: "Extended photoperiod on Level 2",
-    reasoning:
-      "Camera analysis showed slower leaf expansion on Level 2 compared with Levels 1 and 3 over the past 4 days, while temperature and EC were within range. Since lighting is a low-risk, per-level action already cleared for automatic control, the photoperiod was extended by 45 minutes without requiring approval.",
-    status: "Auto-applied",
-    sensor: "Leaf area +6% below Level 1/3 average",
-  },
-  {
-    id: 3,
-    timestamp: "Today, 11:47",
-    level: "action",
-    category: "Spacing",
-    title: "Recommended telescopic channel expansion",
-    reasoning:
-      "Canopy overlap in the camera feed exceeded the crowding threshold for this growth stage on Level 1. Because channel expansion is a manual physical action, Leafy AI can only recommend it, not perform it. The recommendation is queued for a technician to carry out during the next farm visit.",
-    status: "Awaiting manual action",
-    sensor: "Canopy overlap 34% (threshold 25%)",
-  },
-  {
-    id: 4,
-    timestamp: "Yesterday, 19:20",
-    level: "alert",
-    category: "Monitoring",
-    title: "Possible early nutrient deficiency detected",
-    reasoning:
-      "Leaf-colour analysis on 3 plants in Level 3 showed a yellowing pattern consistent with early nitrogen deficiency, but confidence was below the threshold needed to trigger a dosing recommendation. Flagged for human visual confirmation rather than acted on automatically, in line with the rule that medium/high-risk calls need trend or human confirmation.",
-    status: "Acknowledged",
-    sensor: "Vision confidence 62% (action threshold 80%)",
-  },
-  {
-    id: 5,
-    timestamp: "Yesterday, 09:14",
-    level: "action",
-    category: "Irrigation",
-    title: "Irrigation cycle shortened",
-    reasoning:
-      "Root zone images and EC trend together suggested mild overwatering rather than nutrient excess. Since irrigation is shared across the whole farm and classed as higher-risk, the shortened cycle was only applied after a supervisor approved it through the dashboard.",
-    status: "Approved",
-    sensor: "EC stable, substrate visibly saturated",
-  },
-  {
-    id: 6,
-    timestamp: "2 days ago, 16:41",
-    level: "info",
-    category: "Harvest",
-    title: "Harvest outcome recorded — Level 1, Batch 7",
-    reasoning:
-      "Yield and leaf-quality data for Batch 7 were logged against the growing routine that produced them, so future recommendations for similar conditions can be weighted by this outcome rather than treated as a fresh guess each time.",
-    status: "Logged",
-    sensor: "Yield 1.4 kg, 92% Grade A leaves",
-  },
-  {
-    id: 7,
-    timestamp: "2 days ago, 08:03",
-    level: "action",
-    category: "Lighting",
-    title: "Fan speed increased on Level 3",
-    reasoning:
-      "Temperature and humidity sensors on Level 3 both trended upward for over an hour, consistent with reduced airflow rather than a faulty reading. Fan control is a low-risk, per-level action, so the increase was applied automatically and logged.",
-    status: "Auto-applied",
-    sensor: "28.4°C / 76% RH (target ≤26°C / 70% RH)",
-  },
-  {
-    id: 8,
-    timestamp: "3 days ago, 12:56",
-    level: "alert",
-    category: "Dosing",
-    title: "Dosing command blocked by safety layer",
-    reasoning:
-      "A proposed pH correction would have exceeded the maximum per-cycle dosing limit hard-coded into the safety layer. The command was rejected before reaching the relay pumps, and a smaller, compliant correction was proposed in its place for approval.",
-    status: "Rejected by safety layer",
-    sensor: "pH 5.4 → requested correction 0.9 (limit 0.4/cycle)",
-  },
-];
 
 type LogLevel = "alert" | "action" | "info";
 
@@ -138,15 +50,59 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Harvest: Sprout,
 };
 
-const FILTERS = ["All", "Actions", "Alerts", "Info"];
+const FILTERS = ["All", "Actions", "Alerts"];
 
 export function LogsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const logs = useSafetyList(safetyApi.commands);
+  const [now, setNow] = useState(() => Date.now());
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const [actionError, setActionError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const entries = useMemo(() => logs.items.map((request) => {
+    const expired = !request.startedAt && ["pending_approval", "approved"].includes(request.status) && Date.parse(request.expiresAt) <= now;
+    const status = expired ? "expired" : request.status;
+    return {
+      id: request.requestId,
+      timestamp: new Date(request.createdAt).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" }),
+      level: (["blocked", "failed", "unknown"].includes(status) ? "alert" : "action") as LogLevel,
+      category: "Device operation",
+      title: `Run device for ${request.durationSeconds} seconds`,
+      reasoning: request.reason,
+      status: status === "pending_approval" ? "Pending review" : status.replaceAll("_", " "),
+      sensor: null,
+      request,
+      expired,
+    };
+  }), [logs.items, now]);
+
+  async function reviewRequest(id: string, action: "approve" | "reject") {
+    if (inFlight.current) return;
+    const request = logs.items.find((item) => item.requestId === id);
+    if (!request || request.status !== "pending_approval" || Date.parse(request.expiresAt) <= now) return;
+    if (!window.confirm(`${action === "approve" ? "Approve" : "Reject"} this operation? Approval does not execute hardware.`)) return;
+    inFlight.current = true;
+    setBusy(true); setActionError(""); setFeedback("");
+    try {
+      const result = await safetyApi.review(id, action);
+      setFeedback(`Request ${result.status.replaceAll("_", " ")}. ${result.resultMessage ?? ""}`);
+    } catch (error) {
+      setActionError(`${safetyError(error)} Check the refreshed record before retrying.`);
+    } finally {
+      inFlight.current = false; setBusy(false); logs.refresh();
+    }
+  }
 
   const filtered = useMemo(() => {
-    return MOCK_LOG.filter((entry) => {
+    return entries.filter((entry) => {
       const matchesFilter =
         activeFilter === "All" ||
         (activeFilter === "Actions" && entry.level === "action") ||
@@ -158,19 +114,20 @@ export function LogsPage() {
         q === "" ||
         entry.title.toLowerCase().includes(q) ||
         entry.category.toLowerCase().includes(q) ||
+        entry.request.deviceId.toLowerCase().includes(q) ||
         entry.reasoning.toLowerCase().includes(q);
 
       return matchesFilter && matchesQuery;
     });
-  }, [activeFilter, query]);
+  }, [activeFilter, query, entries]);
 
   const counts = useMemo(
     () => ({
-      alerts: MOCK_LOG.filter((e) => e.level === "alert").length,
-      pending: MOCK_LOG.filter((e) => e.status === "Pending review").length,
-      autoApplied: MOCK_LOG.filter((e) => e.status === "Auto-applied").length,
+      alerts: entries.filter((e) => e.level === "alert").length,
+      pending: entries.filter((e) => e.status === "Pending review").length,
+      autoApplied: entries.filter((e) => e.status === "approved").length,
     }),
-    [],
+    [entries],
   );
 
   return (
@@ -184,18 +141,22 @@ export function LogsPage() {
           Action log & reasoning
         </h1>
         <p className="text-gray-500 text-base max-w-2xl">
-          Every recommendation, automatic action, and alert the agent has raised
-          for the basil farm, with the plain-language reasoning behind each one.
+          Stored operation requests, safety outcomes, and human reviews.
+          Hardware execution is not connected. Times are Melbourne time.
         </p>
       </div>
 
+      {(logs.error || actionError) && <Alert variant="destructive"><AlertDescription>{actionError || logs.error}</AlertDescription></Alert>}
+      {feedback && <Alert role="status"><AlertDescription>{feedback}</AlertDescription></Alert>}
+      <div className="mb-4 flex items-center gap-3"><Button variant="outline" disabled={busy || logs.status === "loading"} onClick={logs.refresh}>Refresh logs</Button><p className="text-sm text-muted-foreground">Counts, search and filters apply to this page of operation requests.</p></div>
+      {logs.status === "loading" && <p role="status">Loading logs...</p>}
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
           <div className="font-mono text-2xl font-medium text-red-500">
             {counts.alerts}
           </div>
-          <div className="text-sm text-gray-500 mt-1">Alerts raised</div>
+          <div className="text-sm text-gray-500 mt-1">Blocked / failed requests</div>
         </div>
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
           <div className="font-mono text-2xl font-medium text-amber-500">
@@ -207,7 +168,7 @@ export function LogsPage() {
           <div className="font-mono text-2xl font-medium text-emerald-500">
             {counts.autoApplied}
           </div>
-          <div className="text-sm text-gray-500 mt-1">Auto-applied</div>
+          <div className="text-sm text-gray-500 mt-1">Approved, not executed</div>
         </div>
       </div>
 
@@ -242,15 +203,16 @@ export function LogsPage() {
         </div>
       </div>
 
+      <div className="mb-4 flex items-center gap-3"><Button variant="outline" disabled={busy || logs.status === "loading" || logs.offset === 0} onClick={() => logs.page(logs.offset - 20)}>Previous</Button><span>Page {logs.offset / 20 + 1}</span><Button variant="outline" disabled={busy || logs.status !== "ready" || logs.items.length < 20} onClick={() => logs.page(logs.offset + 20)}>Next</Button></div>
       {/* Log Entries */}
       <div className="flex flex-col gap-3">
-        {filtered.length === 0 && (
+        {logs.status === "ready" && filtered.length === 0 && (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
             No log entries match that search or filter.
           </div>
         )}
 
-        {filtered.map((entry) => {
+        {logs.status === "ready" && filtered.map((entry) => {
           const style = LEVEL_STYLES[entry.level as LogLevel];
           const CategoryIcon = CATEGORY_ICONS[entry.category] || Sprout;
           const LevelIcon = style.Icon;
@@ -263,9 +225,13 @@ export function LogsPage() {
             >
               <div
                 className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                role="button"
+                tabIndex={0}
+                aria-expanded={isOpen}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setExpandedId(isOpen ? null : entry.id); } }}
                 onClick={() => setExpandedId(isOpen ? null : entry.id)}
               >
-                <CategoryIcon className="w-5 h-5 ${style.color}" />
+                <CategoryIcon className={`size-5 ${style.color}`} />
 
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 dark:text-white truncate">
@@ -299,6 +265,17 @@ export function LogsPage() {
                   <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-3 max-w-3xl">
                     {entry.reasoning}
                   </p>
+                  <div className="mb-3 flex flex-col gap-2 break-words text-sm text-muted-foreground">
+                    <p>Device UUID: {entry.request.deviceId}</p>
+                    <p>{entry.expired ? "Request expired before execution." : entry.request.resultMessage}</p>
+                    <p>Expires: {new Date(entry.request.expiresAt).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" })}</p>
+                    {entry.request.reviewedAt && <p>Reviewed: {new Date(entry.request.reviewedAt).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" })}</p>}
+                    {entry.request.reviewedBy && <p>Reviewer UUID: {entry.request.reviewedBy}</p>}
+                  </div>
+                  <div className="mb-3 flex gap-2">
+                    <Button disabled={busy || entry.status !== "Pending review"} onClick={() => void reviewRequest(entry.id, "approve")}>Approve</Button>
+                    <Button variant="outline" disabled={busy || entry.status !== "Pending review"} onClick={() => void reviewRequest(entry.id, "reject")}>Reject</Button>
+                  </div>
 
                   {entry.sensor && (
                     <div className="font-mono text-xs text-gray-500 bg-gray-50 dark:bg-gray-800/50 inline-flex px-2 py-1 rounded border border-gray-100 dark:border-gray-800">
