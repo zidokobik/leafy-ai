@@ -23,23 +23,14 @@ CREATE TABLE public.devices (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT devices_pkey PRIMARY KEY (device_id)
 );
+-- Latest synced image per camera. `id` is the tutor API's `camera_name` (e.g. level1_camera1);
+-- `image_url` points at the public Supabase Storage bucket the hourly sync uploads to.
 CREATE TABLE public.cameras (
-  camera_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  camera_name character varying NOT NULL,
-  level_id uuid,
-  status character varying,
-  CONSTRAINT cameras_pkey PRIMARY KEY (camera_id)
-);
-CREATE TABLE public.images (
-  image_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  captured_at timestamp with time zone NOT NULL,
-  camera_id bigint,
-  crop_cycle_id bigint,
-  experiment_id bigint,
-  source_protocol character varying,
+  id text NOT NULL,
+  label text NOT NULL,
   image_url text,
-  CONSTRAINT images_pkey PRIMARY KEY (image_id),
-  CONSTRAINT images_camera_id_fkey FOREIGN KEY (camera_id) REFERENCES public.cameras(camera_id)
+  captured_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT cameras_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.alerts (
   alert_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,

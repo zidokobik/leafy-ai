@@ -1,7 +1,23 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
+from backend.dependencies.auth import get_current_auth_user
+from backend.dependencies.database_session import AsyncDatabaseSession
+from backend.schemas.camera import CameraImage
+from backend.services import camera as camera_service
 
 router = APIRouter(prefix="/camera", tags=["camera"])
+
+
+@router.get(
+	"/latest",
+	dependencies=[Depends(get_current_auth_user)],
+	description="""
+		The latest image for every camera, ordered by camera id. Images are copied hourly from the
+		AWS's API into Supabase Storage, so `imageUrl` is a permanent public link.
+	""",
+)
+async def read_latest_camera_images(session: AsyncDatabaseSession) -> list[CameraImage]:
+	return await camera_service.list_cameras(session)
 
 
 @router.get(

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from uuid import UUID
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -12,9 +13,11 @@ from backend.settings import get_settings
 
 from .agent_job import execute_agent_scheduled_job
 from .poll_sensors import poll_sensors
+from .sync_cameras import sync_cameras
 
 SCHEDULER = AsyncIOScheduler()
 SENSOR_POLL_JOB_ID = "sensor-poll"
+CAMERA_SYNC_JOB_ID = "camera-sync"
 
 
 def _agent_job_id(job_id: UUID) -> str:
@@ -30,7 +33,7 @@ async def add_agent_scheduled_job_to_scheduler(job: AgentScheduledJob) -> None:
 		name=job.title,
 		kwargs={"job": job},
 		replace_existing=True,
-		max_instances=1
+		max_instances=1,
 	)
 
 
@@ -43,6 +46,16 @@ async def remove_agent_scheduled_job_from_scheduler(job_id: UUID) -> None:
 @asynccontextmanager
 async def run_scheduler():
 	SCHEDULER.add_job(poll_sensors, "interval", seconds=30, id=SENSOR_POLL_JOB_ID, replace_existing=True)
+	# Run once at startup so the dashboard has images straight away, then hourly.
+	SCHEDULER.add_job(
+		sync_cameras,
+		"interval",
+		hours=1,
+		next_run_time=datetime.now(UTC),
+		id=CAMERA_SYNC_JOB_ID,
+		replace_existing=True,
+		max_instances=1,
+	)
 
 	settings = get_settings()
 	engine = create_async_engine(settings.DATABASE_URI.get_secret_value())
