@@ -35,12 +35,12 @@ FastAPI  GET /api/v1/sensors/history?before=2026-09-18T05%3A08%3A00Z&end=2026-09
 
 ## Status codes
 
-| Operation | Success status |
-| --- | --- |
-| Read a resource | `200 OK` |
-| Create a resource | `201 Created` |
-| Replace or partially update a resource | `200 OK` |
-| Delete without a response body | `204 No Content` |
+| Operation                              | Success status   |
+| -------------------------------------- | ---------------- |
+| Read a resource                        | `200 OK`         |
+| Create a resource                      | `201 Created`    |
+| Replace or partially update a resource | `200 OK`         |
+| Delete without a response body         | `204 No Content` |
 
 Common errors use `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `422 Unprocessable Content`, and `500 Internal Server Error` as appropriate.
 
@@ -49,10 +49,10 @@ Common errors use `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Con
 These are the only endpoints the dashboard currently calls. Both require a session cookie and read
 the Postgres `sensor_data` table through `backend/services/sensors.py`.
 
-| Method | Path | Behavior |
-| --- | --- | --- |
-| `GET` | `/api/v1/sensors/history?before={ISO 8601}&end={ISO 8601}` | Readings in the inclusive interval, averaged into adaptive buckets and ordered oldest first |
-| `GET` | `/api/v1/sensors/latest` | The most recent raw reading, or `404` when the table is empty |
+| Method | Path                                                       | Behavior                                                                                    |
+| ------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/v1/sensors/history?before={ISO 8601}&end={ISO 8601}` | Readings in the inclusive interval, averaged into adaptive buckets and ordered oldest first |
+| `GET`  | `/api/v1/sensors/latest`                                   | The most recent raw reading, or `404` when the table is empty                               |
 
 `before` and `end` are required UTC ISO 8601 timestamps. `before` must be earlier than `end`; an
 invalid interval returns `422 Unprocessable Content`. Both bounds are inclusive.
@@ -93,12 +93,12 @@ Scheduled agent jobs require a session cookie and persist a title, agent instruc
 five-field cron expression. A successful create request registers the job with the running
 APScheduler instance immediately; startup also restores every persisted job.
 
-| Method | Path | Behavior |
-| --- | --- | --- |
-| `GET` | `/api/v1/schedules` | List scheduled agent jobs, newest first |
-| `POST` | `/api/v1/schedules` | Create and immediately register a scheduled agent job; returns `201 Created` |
-| `PATCH` | `/api/v1/schedules/{jobId}` | Update a scheduled job's title, instruction, and cron expression, replacing its running scheduler registration |
-| `DELETE` | `/api/v1/schedules/{jobId}` | Remove a scheduled job from persistence and the running scheduler; returns `204 No Content` |
+| Method   | Path                        | Behavior                                                                                                       |
+| -------- | --------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/schedules`         | List scheduled agent jobs, newest first                                                                        |
+| `POST`   | `/api/v1/schedules`         | Create and immediately register a scheduled agent job; returns `201 Created`                                   |
+| `PATCH`  | `/api/v1/schedules/{jobId}` | Update a scheduled job's title, instruction, and cron expression, replacing its running scheduler registration |
+| `DELETE` | `/api/v1/schedules/{jobId}` | Remove a scheduled job from persistence and the running scheduler; returns `204 No Content`                    |
 
 `POST /api/v1/schedules` accepts the following body:
 
@@ -118,14 +118,40 @@ five-field crontab expression. Invalid values return `422 Unprocessable Content`
 and use the same validation as creation. A successful update takes effect immediately in the
 running scheduler.
 
+## Camera images
+
+An hourly scheduler job (also run once at startup) logs in to the AWS's Cognito app client,
+requests fresh presigned links from the tutor's image API, and copies each image into the public
+Supabase Storage bucket `CAMERA_BUCKET` as `<cameraId>.jpg`. The permanent link and capture time are
+stored in the `cameras` table; images whose `captured_at` has not changed are skipped. Run a sync on
+demand with `uv run python -m backend.cli sync-cameras`.
+
+| Method | Path                    | Behavior                                                                |
+| ------ | ----------------------- | ----------------------------------------------------------------------- |
+| `GET`  | `/api/v1/camera/latest` | Latest image for every camera, ordered by id. Requires a session cookie |
+
+```json
+[
+  {
+    "id": "level1_camera1",
+    "label": "Level 1 · Camera 1",
+    "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/images/level1_camera1.jpg?t=1790409600",
+    "capturedAt": "2026-09-26T08:00:00Z"
+  }
+]
+```
+
+`imageUrl` is null until the camera's first successful sync. The `?t=` query changes with each new
+capture so browsers do not show a cached image.
+
 ## Hardware endpoints
 
 These are still mock implementations that return hardcoded values. They are kept as the integration
 points for real hardware and are not yet used by the dashboard.
 
-| Method | Path | Current behavior |
-| --- | --- | --- |
-| `GET` | `/api/v1/camera/raw/{level}/{camera}` | Returns a static sample image |
+| Method | Path                                  | Current behavior              |
+| ------ | ------------------------------------- | ----------------------------- |
+| `GET`  | `/api/v1/camera/raw/{level}/{camera}` | Returns a static sample image |
 
 Their response bodies have not been migrated to the camelCase conventions above.
 
@@ -153,21 +179,20 @@ no per-user roles to manage.
 
 The current session and account endpoints are:
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/v1/auth/login` | Verify email and password, then set the session cookie |
-| `POST` | `/api/v1/auth/logout` | Clear the session cookie |
-| `GET` | `/api/v1/users/me` | Read the authenticated user's profile |
-| `PATCH` | `/api/v1/users/me` | Update only firstName and lastName |
-| `PUT` | `/api/v1/users/me/password` | Change the authenticated user's password |
-| `DELETE` | `/api/v1/users/me` | Permanently delete the authenticated account |
+| Method   | Path                        | Purpose                                                |
+| -------- | --------------------------- | ------------------------------------------------------ |
+| `POST`   | `/api/v1/auth/login`        | Verify email and password, then set the session cookie |
+| `POST`   | `/api/v1/auth/logout`       | Clear the session cookie                               |
+| `GET`    | `/api/v1/users/me`          | Read the authenticated user's profile                  |
+| `PATCH`  | `/api/v1/users/me`          | Update only firstName and lastName                     |
+| `PUT`    | `/api/v1/users/me/password` | Change the authenticated user's password               |
+| `DELETE` | `/api/v1/users/me`          | Permanently delete the authenticated account           |
 
 ## Account settings
 
 `PATCH /api/v1/users/me` accepts `firstName` and `lastName` only (maximum 100
 characters each). Omitted fields are unchanged; null, empty or whitespace-only
-names clear the field. Other fields, including email and user IDs, return
-422. The response is the same profile shape as GET, with a fresh `updatedAt`.
+names clear the field. Other fields, including email and user IDs, return 422. The response is the same profile shape as GET, with a fresh `updatedAt`.
 
 `PUT /api/v1/users/me/password` accepts `{ "newPassword": "..." }` (minimum 8
 characters) and re-hashes it with Argon2. It returns 204 with no body.

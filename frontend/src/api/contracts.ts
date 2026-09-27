@@ -35,3 +35,11 @@ export type AgentScheduledJobWrite = Pick<
   AgentScheduledJob,
   'title' | 'instruction' | 'cronExpression'
 >
+
+/** The latest synced image for one camera. `imageUrl` and `capturedAt` are null until the first sync. */
+export type CameraImage = {
+  id: string
+  label: string
+  imageUrl: string | null
+  capturedAt: string | null
+}

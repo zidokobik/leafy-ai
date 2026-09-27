@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from backend.db_models.users import Users
+from backend.services.camera import CameraSyncConfig, sync_camera_images
 from backend.services.users import create_user, get_user_by_email
 from backend.settings import get_settings
 
@@ -66,6 +67,33 @@ def delete_user_command(user_id: UUID) -> None:
 			await session.delete(user)
 			await session.commit()
 			typer.echo(f"Deleted user {user.email} ({user.user_id})")
+
+	asyncio.run(run())
+
+
+@app.command("sync-cameras")
+def sync_cameras_command() -> None:
+	"""Copy the latest camera images from the AWS's API into Supabase Storage now."""
+
+	config = CameraSyncConfig.from_settings(get_settings())
+	if config is None:
+		typer.echo(
+			"Set STUDENT_CLIENT_ID, STUDENT_USERNAME, STUDENT_PASSWORD, SUPABASE_URL and SUPABASE_SERVICE_KEY.",
+			err=True,
+		)
+		raise typer.Exit(code=1)
+
+	async def run() -> None:
+		async with _make_session() as session:
+			result = await sync_camera_images(session, config)
+		for camera_id in result.updated:
+			typer.echo(f"updated    {camera_id}")
+		for camera_id in result.unchanged:
+			typer.echo(f"unchanged  {camera_id}")
+		for camera_id, error in result.failed.items():
+			typer.echo(f"failed     {camera_id}: {error}", err=True)
+		if result.failed:
+			raise typer.Exit(code=1)
 
 	asyncio.run(run())
 

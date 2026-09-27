@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 
+import { cameraApi } from "@/api/camera";
+import { apiConfig } from "@/api/config";
+import type { CameraImage } from "@/api/contracts";
+
 // --- Types ---
 export type DeviceType = "camera" | "pump" | "doser" | "light" | "sensor";
 export type DeviceStatus = "online" | "offline" | "warning";
@@ -30,46 +34,34 @@ const mockDevices: Device[] = [
 ];
 
 
+export type CameraImagesStatus = "loading" | "ready" | "error";
+
 export function useFarmDevices() {
   const [devices, setDevices] = useState<Device[]>(mockDevices);
-  const [cameraImages, setCameraImages] = useState<Record<string, string>>({});
-  const [isFetchingImages, setIsFetchingImages] = useState(false);
+  const [cameraImages, setCameraImages] = useState<Record<string, CameraImage>>({});
+  const [cameraStatus, setCameraStatus] = useState<CameraImagesStatus>("loading");
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchLatestImages() {
-      const token = import.meta.env.VITE_AWS_TOKEN || import.meta.env.AWS_TOKEN;
-      const API_URL = "/images/student/latest"; 
-
-      if (!token) return;
-
       try {
-        setIsFetchingImages(true);
-        const response = await fetch(API_URL, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
-        });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const data = await response.json();
-        const imageMap: Record<string, string> = {};
-        
-        data.images.forEach((img: any) => {
-          imageMap[img.camera_name] = img.image_url || img.url || img.presigned_url; 
-        });
-
-        setCameraImages(imageMap);
+        const cameras = await cameraApi.getLatest(controller.signal);
+        setCameraImages(Object.fromEntries(cameras.map((camera) => [camera.id, camera])));
+        setCameraStatus("ready");
       } catch (error) {
-        console.error("Failed to fetch images:", error);
-      } finally {
-        setIsFetchingImages(false);
+        if (controller.signal.aborted) return;
+        console.error("Failed to fetch camera images:", error);
+        setCameraStatus("error");
       }
     }
 
     fetchLatestImages();
+    const interval = window.setInterval(fetchLatestImages, apiConfig.cameraPollMs);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
   }, []);
 
   const toggleDevice = (id: string) => {
@@ -81,7 +73,7 @@ export function useFarmDevices() {
   return {
     devices,
     cameraImages,
-    isFetchingImages,
+    cameraStatus,
     toggleDevice
   };
 }

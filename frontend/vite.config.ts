@@ -16,11 +16,6 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true
-      },
-      '/images': {
-        target: 'https://hrfhf8qlce.execute-api.ap-southeast-2.amazonaws.com',
-        changeOrigin: true,
-        secure: false, // Helps avoid local SSL certificate issues
       }
     },
   },
