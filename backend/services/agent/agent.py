@@ -1,11 +1,12 @@
 from collections.abc import AsyncIterator
+from uuid import UUID
 
 import ai
 import ai.ui.ai_sdk
 
 from backend.settings import get_settings
 
-from .agent_tools import miscelaneous, sensors
+from .agent_tools import miscelaneous, proposals, sensors
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
@@ -16,11 +17,17 @@ def get_provider() -> ai.Provider:
 	return ai.get_provider("vercel", api_key=settings.AI_GATEWAY_API_KEY.get_secret_value())
 
 
-def build_agent() -> ai.Agent:
+def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = None) -> ai.Agent:
+	proposal_tool = (
+		proposals.scheduled_proposal_tool(schedule_id)
+		if schedule_id is not None
+		else proposals.propose_device_operation
+	)
 	return ai.Agent(
 		tools=[
 			miscelaneous.get_unix_timestamp,
 			sensors.get_sensor_history,
+			*([proposals.get_operation_devices, proposal_tool] if allow_proposals else []),
 		]
 	)
 
@@ -40,7 +47,7 @@ async def stream_chat_response(
 
 	provider = get_provider()
 	model = ai.Model(id=settings.AI_MODEL, provider=provider)
-	agent = build_agent()
+	agent = build_agent(allow_proposals=True)
 
 	async with agent.run(model, messages) as stream:
 		ai.ui.ai_sdk.apply_approvals(approvals)

@@ -44,7 +44,23 @@ before execution; approval alone is not a permanent safety guarantee.
 The frontend `/logs` page lists requests and confirms reviews; `/safety` manages rules only.
 It uses existing session cookies and paginates each list in groups of 20. Device
 UUIDs are shown because this API does not expose a device-name directory yet.
-No hardware execution or automatic AI logging integration is included.
+Chat now exposes get_operation_devices and propose_device_operation. A proposal
+records an AI decision, then submits a linked request through safety validation
+with a server-controlled ten-minute expiry. No approval, rule-editing, or hardware
+tool is exposed. Scheduled agents use a separate tool with a server-bound
+schedule_id, recorded on ai_decisions. They require the same human review and
+ten-minute expiry as chat proposals.
+
+Scheduled runs submit at most one proposal per device per run, including failed
+attempts. The scheduler uses max_instances=1, coalesce=True and a 60-second misfire
+grace period. Failures are logged and not automatically retried. Run one scheduler
+process: these protections do not provide cross-process or restart-safe exactly-once
+execution. Separate cron runs may still produce separate pending requests.
+
+Decision persistence and command submission are separate transactions: if submission
+fails, the decision may remain without a request. Do not automatically retry after
+an error; inspect Logs first. General informational chat is not automatically logged
+as a decision. Live LLM/database integration still needs manual verification.
 Reads and status filters report unstarted pending/approved requests as expired
 when their deadline passes, without writing during GET. Review persists expiry.
 Executing or completed records keep their status. Login also checks the account

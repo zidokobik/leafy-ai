@@ -30,7 +30,9 @@ async def add_agent_scheduled_job_to_scheduler(job: AgentScheduledJob) -> None:
 		name=job.title,
 		kwargs={"job": job},
 		replace_existing=True,
-		max_instances=1
+		max_instances=1,
+		coalesce=True,
+		misfire_grace_time=60,
 	)
 
 
