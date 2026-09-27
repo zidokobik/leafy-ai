@@ -6,7 +6,7 @@ import ai.ui.ai_sdk
 
 from backend.settings import get_settings
 
-from .agent_tools import miscelaneous, proposals, sensors
+from .agent_tools import camera, miscelaneous, proposals, sensors
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
@@ -27,6 +27,8 @@ def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = Non
 		tools=[
 			miscelaneous.get_unix_timestamp,
 			sensors.get_sensor_history,
+			camera.list_cameras,
+			camera.get_camera_image,
 			*([proposals.get_operation_devices, proposal_tool] if allow_proposals else []),
 		]
 	)
