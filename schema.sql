@@ -65,3 +65,52 @@ CREATE TABLE public.agent_scheduled_job (
   title text NOT NULL,
   CONSTRAINT agent_scheduled_job_pkey PRIMARY KEY (id)
 );
+
+-- Safety rules and AI decision logging. Demo devices and rules are seed data,
+-- not part of this schema. Approval does not trigger hardware execution yet.
+CREATE TABLE public.safety_rules (
+  rule_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id uuid NOT NULL REFERENCES public.devices(device_id),
+  action_type text NOT NULL DEFAULT 'run_for_duration'
+    CHECK (action_type IN ('run_for_duration')),
+  max_duration_seconds integer NOT NULL CHECK (max_duration_seconds > 0),
+  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK (cooldown_seconds >= 0),
+  enabled boolean NOT NULL DEFAULT true,
+  CONSTRAINT safety_rules_device_action_unique UNIQUE (device_id, action_type)
+);
+
+CREATE TABLE public.ai_decisions (
+  decision_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  summary text NOT NULL CHECK (length(trim(summary)) > 0),
+  recommendation text NOT NULL CHECK (length(trim(recommendation)) > 0),
+  schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL
+);
+
+-- alerts.decision_id remains an existing bigint without a foreign key;
+-- it is not linked to the UUID key in ai_decisions.
+CREATE TABLE public.command_requests (
+  request_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  decision_id uuid REFERENCES public.ai_decisions(decision_id),
+  device_id uuid NOT NULL REFERENCES public.devices(device_id),
+  action_type text NOT NULL DEFAULT 'run_for_duration'
+    CHECK (action_type IN ('run_for_duration')),
+  duration_seconds integer NOT NULL CHECK (duration_seconds > 0),
+  reason text NOT NULL CHECK (length(trim(reason)) > 0),
+  status text NOT NULL DEFAULT 'pending_approval'
+    CHECK (status IN (
+      'pending_approval', 'blocked', 'approved', 'rejected', 'expired',
+      'executing', 'succeeded', 'failed', 'unknown'
+    )),
+  reviewed_by uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  started_at timestamptz,
+  finished_at timestamptz,
+  result_message text,
+  CONSTRAINT command_requests_expiry_check CHECK (expires_at > created_at),
+  CONSTRAINT command_requests_execution_time_check CHECK (
+    finished_at IS NULL OR (started_at IS NOT NULL AND finished_at >= started_at)
+  )
+);
