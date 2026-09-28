@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, randomUUID } from "@/lib/utils";
 import { ChatSession } from "./ChatSession";
 import { useConversations } from "./useConversations";
 
@@ -177,11 +177,11 @@ function SavedConversation({
 
 export function AgentsPage() {
   const { conversations, status, retry, refresh, remove } = useConversations();
-  const [activeId, setActiveId] = useState<string>(() => crypto.randomUUID());
+  const [activeId, setActiveId] = useState<string>(() => randomUUID());
   const [isNew, setIsNew] = useState(true);
 
   const startNewChat = () => {
-    setActiveId(crypto.randomUUID());
+    setActiveId(randomUUID());
     setIsNew(true);
   };
 
