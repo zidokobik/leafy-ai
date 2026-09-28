@@ -33,3 +33,4 @@ class AgentScheduledJobRead(AgentScheduledJobWrite):
 
 	id: uuid.UUID
 	created_at: datetime
+	next_run: datetime | None = None

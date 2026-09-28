@@ -1,10 +1,21 @@
+from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
+from apscheduler.job import Job
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.db_models.agent_scheduled_job import AgentScheduledJob
+
+
+def get_next_job_run(job_id: str) -> datetime | None:
+	from backend.schedule import SCHEDULER
+
+	job: Job = SCHEDULER.get_job(job_id)
+	if job is not None:
+		return job.next_run_time
+	return None
 
 
 async def list_scheduled_jobs(session: AsyncSession) -> list[AgentScheduledJob]:

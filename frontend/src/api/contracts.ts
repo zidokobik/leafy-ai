@@ -29,6 +29,7 @@ export type AgentScheduledJob = {
   instruction: string
   cronExpression: string
   createdAt: string
+  nextRun: string | null
 }
 
 export type AgentScheduledJobWrite = Pick<

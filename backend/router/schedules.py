@@ -16,7 +16,18 @@ router = APIRouter(
 
 @router.get("", response_model=list[AgentScheduledJobRead], description="List configured agent schedule jobs.")
 async def read_scheduled_jobs(session: AsyncDatabaseSession) -> list[AgentScheduledJobRead]:
-	return await schedule_service.list_scheduled_jobs(session)
+	jobs = [
+		AgentScheduledJobRead(
+			id=job.id,
+			title=job.title,
+			instruction=job.instruction,
+			cron_expression=job.cron_expression,
+			created_at=job.created_at,
+			next_run=schedule_service.get_next_job_run(str(job.id)),
+		)
+		for job in await schedule_service.list_scheduled_jobs(session)
+	]
+	return jobs
 
 
 @router.post("", response_model=AgentScheduledJobRead, status_code=status.HTTP_201_CREATED)
@@ -24,11 +35,14 @@ async def create_scheduled_job(
 	payload: AgentScheduledJobWrite,
 	session: AsyncDatabaseSession,
 ) -> AgentScheduledJobRead:
-	return await schedule_service.create_scheduled_job(
+	job = await schedule_service.create_scheduled_job(
 		session,
 		payload.title,
 		payload.instruction,
 		payload.cron_expression,
+	)
+	return AgentScheduledJobRead.model_validate(job).model_copy(
+		update={"next_run": schedule_service.get_next_job_run(str(job.id))}
 	)
 
 
@@ -47,7 +61,9 @@ async def update_scheduled_job(
 	)
 	if job is None:
 		raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scheduled job not found")
-	return job
+	return AgentScheduledJobRead.model_validate(job).model_copy(
+		update={"next_run": schedule_service.get_next_job_run(str(job.id))}
+	)
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)

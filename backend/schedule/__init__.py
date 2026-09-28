@@ -20,16 +20,12 @@ SENSOR_POLL_JOB_ID = "sensor-poll"
 CAMERA_SYNC_JOB_ID = "camera-sync"
 
 
-def _agent_job_id(job_id: UUID) -> str:
-	return f"agent-job-{job_id}"
-
-
 async def add_agent_scheduled_job_to_scheduler(job: AgentScheduledJob) -> None:
 	trigger = CronTrigger.from_crontab(job.cron_expression)
 	SCHEDULER.add_job(
 		execute_agent_scheduled_job,
 		trigger=trigger,
-		id=_agent_job_id(job.id),
+		id=str(job.id),
 		name=job.title,
 		kwargs={"job": job},
 		replace_existing=True,
@@ -40,15 +36,16 @@ async def add_agent_scheduled_job_to_scheduler(job: AgentScheduledJob) -> None:
 
 
 async def remove_agent_scheduled_job_from_scheduler(job_id: UUID) -> None:
-	scheduler_job_id = _agent_job_id(job_id)
-	if SCHEDULER.get_job(scheduler_job_id) is not None:
-		SCHEDULER.remove_job(scheduler_job_id)
+	if SCHEDULER.get_job(str(job_id)) is not None:
+		SCHEDULER.remove_job(str(job_id))
 
 
 @asynccontextmanager
 async def run_scheduler():
+
 	SCHEDULER.add_job(poll_sensors, "interval", seconds=30, id=SENSOR_POLL_JOB_ID, replace_existing=True)
 	# Run once at startup so the dashboard has images straight away, then hourly.
+
 	SCHEDULER.add_job(
 		sync_cameras,
 		"interval",
@@ -63,7 +60,6 @@ async def run_scheduler():
 	engine = create_async_engine(settings.DATABASE_URI.get_secret_value())
 	async with AsyncSession(engine) as session:
 		scheduled_jobs = await list_scheduled_jobs(session)
-
 	for job in scheduled_jobs:
 		await add_agent_scheduled_job_to_scheduler(job)
 

@@ -16,6 +16,7 @@ export function useScheduledJobs() {
     status: 'loading',
     error: '',
   })
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -33,7 +34,18 @@ export function useScheduledJobs() {
 
     void load()
     return () => controller.abort()
-  }, [])
+  }, [reloadKey])
+
+  // Refetch shortly after the earliest upcoming run so the scheduler's new next run is shown.
+  useEffect(() => {
+    const upcoming = state.jobs
+      .map((job) => (job.nextRun ? new Date(job.nextRun).getTime() : NaN))
+      .filter((time) => time > Date.now())
+    if (upcoming.length === 0) return
+    const delay = Math.min(Math.min(...upcoming) - Date.now() + 2000, 2 ** 31 - 1)
+    const timer = window.setTimeout(() => setReloadKey((key) => key + 1), delay)
+    return () => window.clearTimeout(timer)
+  }, [state.jobs])
 
   async function create(job: AgentScheduledJobWrite) {
     const created = await schedulesApi.create(job)
