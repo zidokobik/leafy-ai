@@ -114,3 +114,26 @@ CREATE TABLE public.command_requests (
     finished_at IS NULL OR (started_at IS NOT NULL AND finished_at >= started_at)
   )
 );
+
+-- Conversation history for the agent chat. Interactive chats are created by
+-- POST /api/v1/chat; scheduled agent runs store one conversation per execution
+-- with source = 'schedule'. schedule_id survives as NULL if the schedule is deleted.
+CREATE TABLE public.chat_conversations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL CHECK (length(trim(title)) > 0),
+  source text NOT NULL DEFAULT 'chat' CHECK (source IN ('chat', 'schedule')),
+  schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- One serialized AI SDK runtime message (ai.messages.Message JSON) per row,
+-- ordered by seq within its conversation. History is replaced wholesale on save.
+CREATE TABLE public.chat_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL REFERENCES public.chat_conversations(id) ON DELETE CASCADE,
+  seq integer NOT NULL CHECK (seq >= 0),
+  payload jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT chat_messages_conversation_seq_unique UNIQUE (conversation_id, seq)
+);

@@ -1,3 +1,5 @@
+import type { UIMessage } from 'ai'
+
 /** A sensor sample. Every measurement is nullable because a reading can be missing a field. */
 export type SensorReading = {
   timestamp: string
@@ -43,4 +45,18 @@ export type CameraImage = {
   label: string
   imageUrl: string | null
   capturedAt: string | null
+}
+
+/** A stored agent conversation. `source` is 'schedule' for scheduled agent runs. */
+export type ChatConversationSummary = {
+  id: string
+  title: string
+  source: 'chat' | 'schedule'
+  scheduleId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ChatConversationDetail = ChatConversationSummary & {
+  messages: UIMessage[]
 }

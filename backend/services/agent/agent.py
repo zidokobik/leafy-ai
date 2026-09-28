@@ -1,15 +1,21 @@
+import logging
 from collections.abc import AsyncIterator
 from uuid import UUID
 
 import ai
 import ai.ui.ai_sdk
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.dependencies.database_session import get_engine
+from backend.services import chat_history
 from backend.settings import get_settings
 
 from .agent_tools import camera, miscelaneous, proposals, sensors
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
+
+logger = logging.getLogger(__name__)
 
 
 def get_provider() -> ai.Provider:
@@ -37,8 +43,13 @@ def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = Non
 async def stream_chat_response(
 	messages: list[ai.messages.Message],
 	approvals: list[ai.ui.ai_sdk.ApprovalResponse] | None = None,
+	conversation_id: UUID | None = None,
 ) -> AsyncIterator[str]:
-	"""Run the chat agent over the given UI messages, yielding AI SDK UI SSE chunks."""
+	"""Run the chat agent over the given UI messages, yielding AI SDK UI SSE chunks.
+
+	When `conversation_id` is given, the full run history is persisted after the
+	stream completes, creating the conversation on first use.
+	"""
 	# See: https://ai-python.dev/docs/basics/ai-sdk-ui#tool-approvals
 	if approvals is None:
 		approvals = []
@@ -55,3 +66,11 @@ async def stream_chat_response(
 		ai.ui.ai_sdk.apply_approvals(approvals)
 		async for chunk in ai.ui.ai_sdk.to_sse(stream):
 			yield chunk
+
+	if conversation_id is not None:
+		try:
+			async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+				await chat_history.save_conversation(session, conversation_id, stream.messages)
+		except Exception:
+			# The response already streamed; losing history must not break the chat.
+			logger.exception("Failed to persist conversation %s", conversation_id)

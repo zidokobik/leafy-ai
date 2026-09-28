@@ -1,8 +1,13 @@
 import logging
+import uuid
 
 import ai
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db_models.agent_scheduled_job import AgentScheduledJob
+from backend.db_models.chat_history import SCHEDULE_SOURCE
+from backend.dependencies.database_session import get_engine
+from backend.services import chat_history
 from backend.services.agent.agent import SYSTEM_PROMPT as FARM_SYSTEM_PROMPT
 from backend.services.agent.agent import build_agent, get_provider
 from backend.settings import get_settings
@@ -55,4 +60,18 @@ async def execute_agent_scheduled_job(job: AgentScheduledJob):
 	except Exception:
 		logger.exception("Scheduled agent run failed: %s; inspect Logs before retrying", job.id)
 		raise
+
+	try:
+		async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+			conversation = await chat_history.save_conversation(
+				session,
+				uuid.uuid4(),
+				stream.messages,
+				title=job.title,
+				source=SCHEDULE_SOURCE,
+				schedule_id=job.id,
+			)
+		logger.info("Scheduled agent run stored as conversation %s", conversation.id)
+	except Exception:
+		logger.exception("Failed to persist conversation for scheduled run %s", job.id)
 	logger.info("Scheduled agent run finished: %s; this does not indicate hardware execution", job.id)

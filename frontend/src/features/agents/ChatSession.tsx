@@ -1,0 +1,251 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, isToolUIPart } from "ai";
+import type { UIMessage } from "ai";
+import {
+  BotIcon,
+  CalendarClockIcon,
+  RefreshCwIcon,
+  SendHorizonalIcon,
+  SquareIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import { apiConfig } from "../../api/config";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+} from "@/components/ui/message";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
+import { AssistantParts } from "./MessageParts";
+
+const suggestions = ["Summarize the latest 24 hours sensor data"];
+
+const transport = new DefaultChatTransport({
+  api: `${apiConfig.baseUrl}/api/v1/chat`,
+  credentials: "include",
+});
+
+type ChatSessionProps = {
+  /** Conversation UUID; the backend persists the exchange under this id. */
+  conversationId: string;
+  initialMessages?: UIMessage[];
+  /** Scheduled-run transcripts are read-only. */
+  readOnly?: boolean;
+  onResponseFinished?: () => void;
+};
+
+export function ChatSession({
+  conversationId,
+  initialMessages,
+  readOnly = false,
+  onResponseFinished,
+}: ChatSessionProps) {
+  const [input, setInput] = useState("");
+  const { messages, sendMessage, status, error, stop, regenerate } = useChat({
+    id: conversationId,
+    messages: initialMessages,
+    transport,
+    onFinish: () => onResponseFinished?.(),
+  });
+  const isBusy = status === "submitted" || status === "streaming";
+
+  // Keep the thinking indicator up until the response streams something visible.
+  const lastMessage = messages.at(-1);
+  const showThinking =
+    isBusy &&
+    !(
+      lastMessage?.role === "assistant" &&
+      lastMessage.parts.some(
+        (part) =>
+          (part.type === "text" && part.text.length > 0) ||
+          part.type === "reasoning" ||
+          isToolUIPart(part),
+      )
+    );
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || isBusy) return;
+    void sendMessage({ text: trimmed });
+    setInput("");
+  };
+
+  return (
+    <Card className="min-h-0 min-w-0 flex-1 gap-0 p-0">
+      <MessageScrollerProvider autoScroll>
+        <MessageScroller>
+          <MessageScrollerViewport>
+            <MessageScrollerContent className="p-4">
+              {messages.length === 0 ? (
+                <div className="m-auto flex max-w-md flex-col items-center gap-3 py-12 text-center">
+                  <Avatar size="lg">
+                    <AvatarFallback>
+                      <BotIcon className="size-5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <h2 className="text-base font-medium">Ask about your farm</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Get a quick status update or ask a question about the
+                    hydroponic system.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {suggestions.map((suggestion) => (
+                      <Button
+                        key={suggestion}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isBusy}
+                        onClick={() => void sendMessage({ text: suggestion })}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <MessageScrollerItem
+                    key={message.id}
+                    messageId={message.id}
+                    scrollAnchor={message.role === "user"}
+                  >
+                    <Message align={message.role === "user" ? "end" : "start"}>
+                      <MessageAvatar>
+                        <Avatar size="sm">
+                          <AvatarFallback>
+                            {message.role === "user" ? (
+                              "You"
+                            ) : (
+                              <BotIcon className="size-4" />
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                      </MessageAvatar>
+                      <MessageContent>
+                        {message.role === "user" ? (
+                          <Bubble align="end">
+                            <BubbleContent>
+                              {message.parts
+                                .map((part) =>
+                                  part.type === "text" ? part.text : "",
+                                )
+                                .join("")}
+                            </BubbleContent>
+                          </Bubble>
+                        ) : (
+                          <AssistantParts message={message} />
+                        )}
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                ))
+              )}
+
+              {showThinking && (
+                <Message align="start">
+                  <MessageAvatar>
+                    <Avatar size="sm">
+                      <AvatarFallback>
+                        <BotIcon className="size-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </MessageAvatar>
+                  <MessageContent>
+                    <Bubble variant="muted">
+                      <BubbleContent>
+                        <span className="shimmer">Thinking…</span>
+                      </BubbleContent>
+                    </Bubble>
+                  </MessageContent>
+                </Message>
+              )}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
+
+      {error && (
+        <Alert variant="destructive" className="mx-4 mb-2 shrink-0">
+          <TriangleAlertIcon />
+          <AlertTitle>The agent could not respond</AlertTitle>
+          <AlertDescription>
+            {error.message || "Something went wrong."}
+          </AlertDescription>
+          <AlertAction>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void regenerate()}
+            >
+              <RefreshCwIcon /> Retry
+            </Button>
+          </AlertAction>
+        </Alert>
+      )}
+
+      {readOnly ? (
+        <div className="flex shrink-0 items-center gap-2 border-t border-border p-3 text-sm text-muted-foreground">
+          <CalendarClockIcon className="size-4 shrink-0" />
+          This conversation was created by a scheduled agent run and is
+          read-only.
+        </div>
+      ) : (
+        <form
+          onSubmit={submit}
+          className="flex shrink-0 items-center gap-2 border-t border-border p-3"
+        >
+          <Input
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Ask about your farm..."
+            autoComplete="off"
+          />
+          {isBusy ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={() => void stop()}
+              aria-label="Stop response"
+            >
+              <SquareIcon />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim()}
+              aria-label="Send message"
+            >
+              <SendHorizonalIcon />
+            </Button>
+          )}
+        </form>
+      )}
+    </Card>
+  );
+}

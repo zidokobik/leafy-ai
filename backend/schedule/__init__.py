@@ -44,8 +44,8 @@ async def remove_agent_scheduled_job_from_scheduler(job_id: UUID) -> None:
 async def run_scheduler():
 
 	SCHEDULER.add_job(poll_sensors, "interval", seconds=30, id=SENSOR_POLL_JOB_ID, replace_existing=True)
-	# Run once at startup so the dashboard has images straight away, then hourly.
 
+	# Run once at startup so the dashboard has images straight away, then hourly.
 	SCHEDULER.add_job(
 		sync_cameras,
 		"interval",

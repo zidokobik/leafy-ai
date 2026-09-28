@@ -118,6 +118,47 @@ five-field crontab expression. Invalid values return `422 Unprocessable Content`
 and use the same validation as creation. A successful update takes effect immediately in the
 running scheduler.
 
+## Agent chat and conversation history
+
+The agent chat streams AI SDK UI server-sent events and persists every completed exchange. All
+chat endpoints require a session cookie.
+
+| Method   | Path                                        | Behavior                                                                     |
+| -------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
+| `POST`   | `/api/v1/chat`                              | Run the chat agent and stream the response as AI SDK UI SSE                  |
+| `GET`    | `/api/v1/chat/conversations`                | List stored conversations, most recently updated first                       |
+| `GET`    | `/api/v1/chat/conversations/{conversationId}` | One conversation with its messages in AI SDK UI format, or `404`           |
+| `DELETE` | `/api/v1/chat/conversations/{conversationId}` | Delete a conversation and its messages; returns `204 No Content`           |
+
+`POST /api/v1/chat` accepts `{ "id": "<uuid>", "messages": [...] }`, where `id` is a
+client-generated conversation UUID and `messages` is the full AI SDK UI message history. After the
+stream completes, the server stores the complete run history under that id, creating the
+conversation on first use (its title is derived from the first user message) and replacing the
+stored messages on follow-up turns. Server-side system prompts are never stored or returned. A
+response that fails or is aborted mid-stream is not persisted.
+
+Each scheduled agent job execution is also stored as its own conversation with `source` set to
+`"schedule"`, the schedule's title, and its `scheduleId`. Deleting a schedule keeps its
+conversations and nulls `scheduleId`. The dashboard shows scheduled conversations read-only.
+
+A conversation summary looks like:
+
+```json
+{
+  "id": "9f1dea9e-676a-4155-9da2-2ac62cde523c",
+  "title": "Summarize the latest 24 hours sensor data",
+  "source": "chat",
+  "scheduleId": null,
+  "createdAt": "2026-09-29T01:02:03Z",
+  "updatedAt": "2026-09-29T01:04:05Z"
+}
+```
+
+The detail response adds `messages`, an array of AI SDK UI `UIMessage` objects (`id`, `role`,
+`parts`, `metadata`) that `useChat` can consume directly as initial messages. Conversations are
+stored in the `chat_conversations` and `chat_messages` tables as serialized runtime messages and
+converted to UI messages on read by `backend/services/chat_history.py`.
+
 ## Camera images
 
 An hourly scheduler job (also run once at startup) logs in to the AWS's Cognito app client,
