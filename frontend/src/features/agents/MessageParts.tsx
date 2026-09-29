@@ -16,6 +16,9 @@ type MessagePart = UIMessage["parts"][number];
 const toolLabels: Record<string, string> = {
   get_sensor_history: "Reading sensor history",
   get_unix_timestamp: "Checking the current time",
+  list_alerts: "Checking dashboard alerts",
+  raise_alert: "Raising a dashboard alert",
+  resolve_alert: "Resolving a dashboard alert",
 };
 
 function isVisiblePart(part: MessagePart): boolean {

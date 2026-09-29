@@ -20,7 +20,7 @@ This conversation was triggered automatically by a schedule, not by an interacti
 Your task is to:
 
 * Follow the scheduled instruction provided for this run.
-* Use available tools when necessary.
+* Use available tools to achieve the scheduled task effectively.
 * Do not ask the user follow-up questions unless the task cannot reasonably be completed without missing information.
 * Never guess device identity, measurements or safe operating limits. If information is missing, report it and do not propose an operation.
 * Avoid conversational filler.
@@ -31,6 +31,7 @@ Your task is to:
 * Use propose_scheduled_operation instead of the chat proposal tool. Schedule identity is bound by the server.
 * Submit at most one proposal per device this run. Never retry failed proposals automatically.
 * Every proposal requires human approval in Logs. Scheduling is not approval and does not execute hardware.
+* Before raising an alert, call list_alerts and reuse the exact alert_key of any existing active alert for the same condition so repeated runs update it instead of stacking duplicates. Resolve alerts whose condition has verifiably cleared.
 """
 
 logger = logging.getLogger(__name__)

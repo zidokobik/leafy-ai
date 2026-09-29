@@ -87,6 +87,56 @@ A bucketed reading is an average, so `/latest` is the endpoint to use for a curr
 `backend/services/sensors.py` takes an `AsyncSession` plus plain arguments rather than FastAPI
 dependencies, so agent tools can call the same functions without going through HTTP.
 
+## Alerts
+
+Stateful dashboard alerts raised by the agent. The Overview page pins active alerts at the top and
+polls this endpoint on the sensor interval; the Alerts page manages the full lifecycle. Alerts are
+deduplicated by `alertKey`, a stable snake_case condition id (for example `water_ph_high`): at most
+one **active** alert exists per key, and re-raising the same key updates that alert in place and
+increments `occurrences` instead of creating a new row, so repeated scheduled agent runs cannot
+stack duplicates. All endpoints require a session cookie.
+
+Dismissing and resolving are distinct. Dismissing only hides an active alert from the Overview pin
+(it stays active, and a re-raise clears the dismissal so the alert resurfaces). Resolving is the
+explicit close action, performed by the agent's `resolve_alert` tool or a user on the Alerts page.
+
+| Method | Path                                | Behavior                                                                                                              |
+| ------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/v1/alerts?status={filter}`    | List alerts ordered critical first, then most recently raised. `status` is `active` (default), `resolved`, or `all`; supports `limit` (1-100, default 50) and `offset` |
+| `POST` | `/api/v1/alerts/{alertId}/dismiss`  | Hide an active alert from the Overview pin without resolving it. Idempotent; unknown ids return `404`                   |
+| `POST` | `/api/v1/alerts/{alertId}/resolve`  | Explicitly mark an alert resolved. Idempotent; unknown ids return `404`                                                 |
+
+```json
+[
+  {
+    "alertId": "7a75a45e-8b30-4f65-9df3-f306eb52e4a0",
+    "alertKey": "water_ph_high",
+    "severity": "warning",
+    "title": "Water pH trending high",
+    "message": "pH has risen from 6.1 to 7.2 over the last 6 hours.",
+    "status": "active",
+    "occurrences": 3,
+    "scheduleId": "0b7ad34e-98f9-4a3c-8a47-0e6f27de9a1c",
+    "createdAt": "2026-09-30T06:00:00Z",
+    "updatedAt": "2026-09-30T10:00:00Z",
+    "resolvedAt": null,
+    "resolvedBy": null,
+    "dismissedAt": null
+  }
+]
+```
+
+`severity` is `info`, `warning`, or `critical`. `scheduleId` records which scheduled job last
+raised the alert (`null` for interactive chat raises or deleted schedules). `dismissedAt` is set by
+the dismiss endpoint and cleared by a re-raise; the Overview pin only shows active alerts where it
+is `null`. `resolvedBy` is `"agent"` when the agent's `resolve_alert` tool verified the condition
+cleared and `"user"` when someone resolved the alert on the Alerts page. A resolved key can be
+raised again later as a fresh alert with its own history.
+
+The agent manages alerts through the `list_alerts`, `raise_alert`, and `resolve_alert` tools, which
+call `backend/services/alerts.py` directly. There is no HTTP endpoint for creating alerts; the
+dashboard only reads, dismisses, and resolves them.
+
 ## Scheduled agent jobs
 
 Scheduled agent jobs require a session cookie and persist a title, agent instruction, and standard

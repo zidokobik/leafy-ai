@@ -32,21 +32,32 @@ CREATE TABLE public.cameras (
   captured_at timestamp with time zone DEFAULT now(),
   CONSTRAINT cameras_pkey PRIMARY KEY (id)
 );
+-- Stateful dashboard alerts raised and managed by the agent. At most one active
+-- alert per alert_key (partial unique index): re-raising a key updates the row and
+-- bumps occurrences instead of stacking duplicate alerts. Dismissal only hides an
+-- active alert from the Overview pin (a re-raise clears dismissed_at to resurface
+-- it); resolution is explicit via the agent tool or the Alerts page.
 CREATE TABLE public.alerts (
-  alert_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  severity character varying,
-  alert_type character varying,
-  message text,
-  device_id uuid,
-  decision_id bigint,
-  crop_cycle_id bigint,
-  acknowledged_by uuid,
-  acknowledge_at timestamp with time zone,
-  CONSTRAINT alerts_pkey PRIMARY KEY (alert_id),
-  CONSTRAINT alerts_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(device_id),
-  CONSTRAINT alerts_acknowledged_by_fkey FOREIGN KEY (acknowledged_by) REFERENCES public.users(user_id)
+  alert_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  alert_key text NOT NULL CHECK (alert_key ~ '^[a-z0-9_]{1,64}$'),
+  severity text NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
+  title text NOT NULL CHECK (length(trim(title)) > 0 AND length(title) <= 160),
+  message text NOT NULL CHECK (length(trim(message)) > 0 AND length(message) <= 4000),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'resolved')),
+  occurrences integer NOT NULL DEFAULT 1 CHECK (occurrences >= 1),
+  schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  resolved_at timestamptz,
+  resolved_by text CHECK (resolved_by IN ('agent', 'user')),
+  dismissed_at timestamptz,
+  CONSTRAINT alerts_resolution_consistency CHECK (
+    ((status = 'resolved') = (resolved_at IS NOT NULL))
+    AND ((status = 'resolved') = (resolved_by IS NOT NULL))
+  )
 );
+CREATE UNIQUE INDEX alerts_active_key_unique ON public.alerts (alert_key) WHERE status = 'active';
+CREATE INDEX alerts_status_updated_idx ON public.alerts (status, updated_at DESC);
 CREATE TABLE public.sensor_data (
   timestamp_ms bigint NOT NULL DEFAULT ((EXTRACT(epoch FROM clock_timestamp()) * (1000)::numeric))::bigint,
   water_ph double precision,
@@ -87,8 +98,6 @@ CREATE TABLE public.ai_decisions (
   schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL
 );
 
--- alerts.decision_id remains an existing bigint without a foreign key;
--- it is not linked to the UUID key in ai_decisions.
 CREATE TABLE public.command_requests (
   request_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   decision_id uuid REFERENCES public.ai_decisions(decision_id),

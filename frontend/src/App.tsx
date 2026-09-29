@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { AppShell } from "./components/AppShell";
 import { AgentsPage } from "./features/agents/AgentsPage";
+import { AlertsPage } from "./features/alerts/AlertsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { useAuth } from "./features/auth/useAuth";
 import { DevicesPage } from "./features/devices/DevicesPage";
@@ -84,6 +85,7 @@ export default function App() {
           }
         >
           <Route index element={<OverviewPage />} />
+          <Route path="alerts" element={<AlertsPage />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="schedules" element={<SchedulesPage />} />
           <Route path="devices" element={<DevicesPage />} />

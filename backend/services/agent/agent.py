@@ -10,7 +10,7 @@ from backend.dependencies.database_session import get_engine
 from backend.services import chat_history
 from backend.settings import get_settings
 
-from .agent_tools import camera, miscelaneous, proposals, sensors
+from .agent_tools import alerts, camera, miscelaneous, proposals, sensors
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
@@ -35,6 +35,9 @@ def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = Non
 			sensors.get_sensor_history,
 			camera.list_cameras,
 			camera.get_camera_image,
+			alerts.list_alerts,
+			alerts.raise_alert_tool(schedule_id),
+			alerts.resolve_alert,
 			*([proposals.get_operation_devices, proposal_tool] if allow_proposals else []),
 		]
 	)
