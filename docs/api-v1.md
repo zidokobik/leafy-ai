@@ -133,9 +133,10 @@ is `null`. `resolvedBy` is `"agent"` when the agent's `resolve_alert` tool verif
 cleared and `"user"` when someone resolved the alert on the Alerts page. A resolved key can be
 raised again later as a fresh alert with its own history.
 
-The agent manages alerts through the `list_alerts`, `raise_alert`, and `resolve_alert` tools, which
-call `backend/services/alerts.py` directly. There is no HTTP endpoint for creating alerts; the
-dashboard only reads, dismisses, and resolves them.
+The agent manages alerts through the `list_alerts`, `raise_alert`, `update_alert`, and
+`resolve_alert` tools, which call `backend/services/alerts.py` directly (`update_alert` edits an
+active alert's severity, title, or message without counting a new occurrence). There is no HTTP
+endpoint for creating alerts; the dashboard only reads, dismisses, and resolves them.
 
 ## Scheduled agent jobs
 

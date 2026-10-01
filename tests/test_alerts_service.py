@@ -1,10 +1,11 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
 from backend.db_models.alerts import Alert
-from backend.services.alerts import AlertNotFoundError, dismiss_alert, raise_alert, resolve_alert
+from backend.services.alerts import AlertNotFoundError, dismiss_alert, raise_alert, resolve_alert, update_alert
 
 
 def session_mock(executed_alert: Alert | None = None):
@@ -82,6 +83,50 @@ async def test_dismiss_missing_alert():
 	with pytest.raises(AlertNotFoundError):
 		await dismiss_alert(session, uuid4())
 	session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_alert_rejects_invalid_targets():
+	session = session_mock()
+	with pytest.raises(ValueError):  # no fields given
+		await update_alert(session, uuid4())
+	with pytest.raises(AlertNotFoundError):
+		await update_alert(session, uuid4(), severity="critical")
+	session.get.return_value = Alert(
+		alert_key="water_ph_high", severity="warning", title="t", message="m", status="resolved"
+	)
+	with pytest.raises(ValueError):  # resolved alerts are closed records
+		await update_alert(session, uuid4(), severity="critical")
+	session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_alert_edits_without_new_occurrence():
+	schedule_id = uuid4()
+	alert = Alert(alert_key="water_ph_high", severity="warning", title="pH high", message="pH 7.4", occurrences=3)
+	session = session_mock()
+	session.get.return_value = alert
+
+	before = alert.updated_at
+	updated = await update_alert(session, uuid4(), message=" pH 7.6 and rising ", schedule_id=schedule_id)
+	assert updated.message == "pH 7.6 and rising"
+	assert updated.title == "pH high" and updated.severity == "warning"
+	assert updated.occurrences == 3
+	assert updated.schedule_id == schedule_id
+	assert updated.updated_at >= before
+	session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_update_alert_escalation_resurfaces_dismissed():
+	alert = Alert(alert_key="water_ph_high", severity="warning", title="t", message="m", dismissed_at=datetime.now(UTC))
+	session = session_mock()
+	session.get.return_value = alert
+
+	# Downgrades and wording edits keep the dismissal.
+	assert (await update_alert(session, uuid4(), severity="info", title="calmer")).dismissed_at is not None
+	assert (await update_alert(session, uuid4(), message="still low")).dismissed_at is not None
+	assert (await update_alert(session, uuid4(), severity="critical")).dismissed_at is None
 
 
 @pytest.mark.asyncio

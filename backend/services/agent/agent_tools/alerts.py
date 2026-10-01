@@ -56,6 +56,33 @@ def raise_alert_tool(schedule_id: UUID | None = None):
 	return raise_alert
 
 
+def update_alert_tool(schedule_id: UUID | None = None):
+	"""Bind trusted scheduler provenance outside the model-visible arguments."""
+
+	@ai.tool
+	async def update_alert(
+		alert_id: UUID,
+		severity: AlertSeverity | None = None,
+		title: str | None = None,
+		message: str | None = None,
+	) -> dict:
+		"""Edit an active alert's severity, title, or message without counting a new occurrence.
+
+		Get alert_id from list_alerts; only the fields you pass change. Use this to
+		refine wording or escalate/downgrade severity after reassessment. Escalating
+		severity resurfaces a dismissed alert. Use raise_alert instead when the
+		condition is observed again, and resolve_alert when it clears. Resolved
+		alerts cannot be updated; raise a new alert for a returning condition.
+		"""
+		async with AsyncSession(get_engine(), expire_on_commit=False) as session:
+			alert = await alert_service.update_alert(
+				session, alert_id, severity=severity, title=title, message=message, schedule_id=schedule_id
+			)
+		return _dump(alert)
+
+	return update_alert
+
+
 @ai.tool
 async def resolve_alert(alert_id: UUID) -> dict:
 	"""Resolve an active dashboard alert once tool evidence shows its condition cleared.

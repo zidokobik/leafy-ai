@@ -31,7 +31,7 @@ Your task is to:
 * Use propose_scheduled_operation instead of the chat proposal tool. Schedule identity is bound by the server.
 * Submit at most one proposal per device this run. Never retry failed proposals automatically.
 * Every proposal requires human approval in Logs. Scheduling is not approval and does not execute hardware.
-* Before raising an alert, call list_alerts and reuse the exact alert_key of any existing active alert for the same condition so repeated runs update it instead of stacking duplicates. Resolve alerts whose condition has verifiably cleared.
+* Before raising an alert, call list_alerts and reuse the exact alert_key of any existing active alert for the same condition so repeated runs update it instead of stacking duplicates. Use update_alert to refine or re-grade an existing alert without recording a new occurrence. Resolve alerts whose condition has verifiably cleared.
 """
 
 logger = logging.getLogger(__name__)

@@ -16,12 +16,20 @@ ALERT_KEY_PATTERN = re.compile(r"[a-z0-9_]{1,64}")
 MAX_TITLE_LENGTH = 160
 MAX_MESSAGE_LENGTH = 4000
 
+_SEVERITY_RANK = {"info": 0, "warning": 1, "critical": 2}
 # Critical first, then most recently raised.
 _SEVERITY_ORDER = sa.case({"critical": 0, "warning": 1, "info": 2}, value=Alert.severity, else_=3)
 
 
 class AlertNotFoundError(LookupError):
 	pass
+
+
+def _validated(field: str, value: str, max_length: int) -> str:
+	value = value.strip()
+	if not 0 < len(value) <= max_length:
+		raise ValueError(f"{field} must be non-blank and at most {max_length} characters.")
+	return value
 
 
 async def list_alerts(
@@ -47,14 +55,10 @@ async def raise_alert(
 	The update path bumps `occurrences` and `updated_at` so repeated raises (for
 	example from scheduled runs) never stack duplicate rows.
 	"""
-	title = title.strip()
-	message = message.strip()
+	title = _validated("title", title, MAX_TITLE_LENGTH)
+	message = _validated("message", message, MAX_MESSAGE_LENGTH)
 	if not ALERT_KEY_PATTERN.fullmatch(alert_key):
 		raise ValueError("alert_key must be 1-64 characters of lowercase snake_case ([a-z0-9_]).")
-	if not 0 < len(title) <= MAX_TITLE_LENGTH:
-		raise ValueError(f"title must be non-blank and at most {MAX_TITLE_LENGTH} characters.")
-	if not 0 < len(message) <= MAX_MESSAGE_LENGTH:
-		raise ValueError(f"message must be non-blank and at most {MAX_MESSAGE_LENGTH} characters.")
 
 	statement = (
 		insert(Alert)
@@ -86,6 +90,42 @@ async def raise_alert(
 	# populate_existing: apply RETURNING values even if the row is already in the identity map.
 	result = await session.execute(statement, execution_options={"populate_existing": True})
 	alert = result.scalars().one()
+	await session.commit()
+	return alert
+
+
+async def update_alert(
+	session: AsyncSession,
+	alert_id: UUID,
+	*,
+	severity: AlertSeverity | None = None,
+	title: str | None = None,
+	message: str | None = None,
+	schedule_id: UUID | None = None,
+) -> Alert:
+	"""Edit an active alert in place without counting a new occurrence.
+
+	Only the provided fields change. Escalating severity clears a dismissal so the
+	alert resurfaces on the dashboard; other edits keep the dismissal state.
+	"""
+	if severity is None and title is None and message is None:
+		raise ValueError("Provide at least one of severity, title, or message.")
+	alert = await session.get(Alert, alert_id)
+	if alert is None:
+		raise AlertNotFoundError("Alert not found.")
+	if alert.status == "resolved":
+		raise ValueError("Alert is already resolved; raise a new alert instead.")
+	if severity is not None:
+		if _SEVERITY_RANK[severity] > _SEVERITY_RANK[alert.severity]:
+			alert.dismissed_at = None
+		alert.severity = severity
+	if title is not None:
+		alert.title = _validated("title", title, MAX_TITLE_LENGTH)
+	if message is not None:
+		alert.message = _validated("message", message, MAX_MESSAGE_LENGTH)
+	alert.schedule_id = schedule_id
+	alert.updated_at = datetime.now(UTC)
+	session.add(alert)
 	await session.commit()
 	return alert
 

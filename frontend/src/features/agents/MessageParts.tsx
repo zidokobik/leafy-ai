@@ -18,6 +18,7 @@ const toolLabels: Record<string, string> = {
   get_unix_timestamp: "Checking the current time",
   list_alerts: "Checking dashboard alerts",
   raise_alert: "Raising a dashboard alert",
+  update_alert: "Updating a dashboard alert",
   resolve_alert: "Resolving a dashboard alert",
 };
 

@@ -37,6 +37,7 @@ def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = Non
 			camera.get_camera_image,
 			alerts.list_alerts,
 			alerts.raise_alert_tool(schedule_id),
+			alerts.update_alert_tool(schedule_id),
 			alerts.resolve_alert,
 			*([proposals.get_operation_devices, proposal_tool] if allow_proposals else []),
 		]
