@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { AgentChatSheet } from '../agents/AgentChatSheet'
 import { ActiveAlerts } from '../alerts/ActiveAlerts'
 import { SensorChart } from './SensorChart'
 import { sensorMetrics } from './sensorMetrics'
@@ -44,6 +45,7 @@ export function OverviewPage() {
   return (
     <section className="flex flex-col gap-5">
       <ActiveAlerts />
+      <AgentChatSheet />
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-medium tracking-tight">Sensor readings</h1>

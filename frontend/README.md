@@ -77,7 +77,7 @@ src/
 ├── assets/              Imported images and static frontend assets
 ├── components/          App shell and shared shadcn/ui primitives
 ├── features/
-│   ├── agents/          Interactive farm agent chat
+│   ├── agents/          Farm agent chat page and the Overview chat sheet
 │   ├── auth/            Login, session state and account settings
 │   ├── devices/         Placeholder for device controls
 │   ├── overview/        Sensor history charts and range controls

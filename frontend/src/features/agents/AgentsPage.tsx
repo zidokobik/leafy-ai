@@ -1,26 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CalendarClockIcon,
   MessageSquareIcon,
   PlusIcon,
   Trash2Icon,
-  TriangleAlertIcon,
 } from "lucide-react";
-import { chatApi } from "../../api/chat";
-import type {
-  ChatConversationDetail,
-  ChatConversationSummary,
-} from "../../api/contracts";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import type { ChatConversationSummary } from "../../api/contracts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, randomUUID } from "@/lib/utils";
 import { ChatSession } from "./ChatSession";
+import { SavedConversation } from "./SavedConversation";
 import { useConversations } from "./useConversations";
 
 function formatWhen(iso: string): string {
@@ -112,66 +103,6 @@ function ConversationList({
         </div>
       ))}
     </div>
-  );
-}
-
-type SavedConversationProps = {
-  conversationId: string;
-  onResponseFinished: () => void;
-};
-
-/** Loads a stored conversation, then hands it to a chat session. */
-function SavedConversation({
-  conversationId,
-  onResponseFinished,
-}: SavedConversationProps) {
-  const [detail, setDetail] = useState<ChatConversationDetail | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    chatApi
-      .getConversation(conversationId, controller.signal)
-      .then(setDetail)
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
-      });
-    return () => controller.abort();
-  }, [conversationId]);
-
-  if (failed) {
-    return (
-      <Card className="min-h-0 min-w-0 flex-1 items-center justify-center p-4">
-        <Alert variant="destructive" className="max-w-md">
-          <TriangleAlertIcon />
-          <AlertTitle>Could not load the conversation</AlertTitle>
-          <AlertDescription>
-            It may have been deleted. Pick another conversation or start a new
-            chat.
-          </AlertDescription>
-        </Alert>
-      </Card>
-    );
-  }
-
-  if (!detail) {
-    return (
-      <Card className="min-h-0 min-w-0 flex-1 gap-3 p-4">
-        <Skeleton className="h-9 w-2/5 self-end" />
-        <Skeleton className="h-20 w-3/5" />
-        <Skeleton className="h-9 w-1/3 self-end" />
-        <Skeleton className="h-14 w-1/2" />
-      </Card>
-    );
-  }
-
-  return (
-    <ChatSession
-      conversationId={conversationId}
-      initialMessages={detail.messages}
-      readOnly={detail.source === "schedule"}
-      onResponseFinished={onResponseFinished}
-    />
   );
 }
 

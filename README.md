@@ -32,7 +32,7 @@ Routers stay thin: they wire up dependencies and shape responses. The work itsel
 
 The "frontend" refers to the React + TypeScript code in `frontend/`. It was previously managed separately in a different repository, but has been merged into this repository for easier development and deployment. Any changes should `cd` into the `frontend/` directory and run the frontend development server from there.
 
-The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview charts sensor history for a requested `before` to `end` interval using `recharts` through shadcn chart components. Agents provides chat, and Schedules lists, creates and deletes recurring agent jobs. Devices is currently a placeholder.
+The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview charts sensor history for a requested `before` to `end` interval using `recharts` through shadcn chart components, and a floating "Ask agent" button opens the same agent chat in a right-side sheet. Agents provides chat, and Schedules lists, creates and deletes recurring agent jobs. Devices is currently a placeholder.
 
 The frontend UI is built with shadcn/ui source components, Tailwind CSS v4, and a basil-green theme defined in `frontend/src/styles/base.css`. Shared primitives live in `frontend/src/components/ui/`; compose those before adding custom markup or feature-local CSS.
 
