@@ -5,8 +5,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { FarmAlert } from '../../api/alerts'
 import { alertsApi } from '../../api/alerts'
+import { EmailNotifications } from './EmailNotifications'
 import { alertTime, severityMeta } from './severity'
 import { useAlertsData } from './useAlertsData'
 
@@ -82,68 +84,80 @@ export function AlertsPage() {
         <h1 className="text-2xl font-medium">Alerts</h1>
         <p className="mt-1 text-muted-foreground">
           Alerts raised by the agent. Hiding only removes an alert from the Overview pin; it stays
-          active until explicitly resolved here or by the agent. Re-raised alerts reappear.
+          active until explicitly resolved here or by the agent. Re-raised alerts reappear. Critical
+          conditions and requested reports are emailed to the admins in the Email notifications tab.
         </p>
       </header>
-      {(error || actionError) && (
-        <Alert variant="destructive">
-          <AlertDescription>{actionError || error}</AlertDescription>
-        </Alert>
-      )}
-      <Card>
-        <CardHeader>
-          <CardTitle>Active</CardTitle>
-          <CardDescription>Ordered by severity, most recently raised first.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {status === 'loading' && <p role="status">Loading alerts…</p>}
-          {status !== 'loading' && active.length === 0 && (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>No active alerts</EmptyTitle>
-                <EmptyDescription>The agent raises alerts here when something needs attention.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+      <Tabs defaultValue="alerts">
+        <TabsList>
+          <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="email">Email notifications</TabsTrigger>
+        </TabsList>
+        <TabsContent value="alerts" className="flex flex-col gap-6">
+          {(error || actionError) && (
+            <Alert variant="destructive">
+              <AlertDescription>{actionError || error}</AlertDescription>
+            </Alert>
           )}
-          {active.map((alert) => (
-            <ActiveAlertRow
-              key={alert.alertId}
-              alert={alert}
-              busy={busy}
-              onDismiss={(alertId) => void act(() => alertsApi.dismiss(alertId))}
-              onResolve={(alertId) => void act(() => alertsApi.resolve(alertId))}
-            />
-          ))}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Recently resolved</CardTitle>
-          <CardDescription>Closed alerts stay here for reference. A new occurrence starts a fresh alert.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {status !== 'loading' && resolved.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nothing resolved yet.</p>
-          )}
-          {resolved.map((alert) => (
-            <div key={alert.alertId} className="flex items-start gap-3 rounded-lg border p-3">
-              <CheckIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{alert.title}</p>
-                  <Badge variant="secondary">{severityMeta[alert.severity].label}</Badge>
+          <Card>
+            <CardHeader>
+              <CardTitle>Active</CardTitle>
+              <CardDescription>Ordered by severity, most recently raised first.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {status === 'loading' && <p role="status">Loading alerts…</p>}
+              {status !== 'loading' && active.length === 0 && (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>No active alerts</EmptyTitle>
+                    <EmptyDescription>The agent raises alerts here when something needs attention.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+              {active.map((alert) => (
+                <ActiveAlertRow
+                  key={alert.alertId}
+                  alert={alert}
+                  busy={busy}
+                  onDismiss={(alertId) => void act(() => alertsApi.dismiss(alertId))}
+                  onResolve={(alertId) => void act(() => alertsApi.resolve(alertId))}
+                />
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Recently resolved</CardTitle>
+              <CardDescription>Closed alerts stay here for reference. A new occurrence starts a fresh alert.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {status !== 'loading' && resolved.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nothing resolved yet.</p>
+              )}
+              {resolved.map((alert) => (
+                <div key={alert.alertId} className="flex items-start gap-3 rounded-lg border p-3">
+                  <CheckIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{alert.title}</p>
+                      <Badge variant="secondary">{severityMeta[alert.severity].label}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{alert.message}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Resolved by {alert.resolvedBy === 'agent' ? 'the agent' : 'a user'}
+                      {alert.resolvedAt ? ` ${alertTime.format(Date.parse(alert.resolvedAt))}` : ''}
+                      {alert.occurrences > 1 ? ` · was seen ${alert.occurrences} times` : ''}
+                    </p>
+                  </div>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{alert.message}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Resolved by {alert.resolvedBy === 'agent' ? 'the agent' : 'a user'}
-                  {alert.resolvedAt ? ` ${alertTime.format(Date.parse(alert.resolvedAt))}` : ''}
-                  {alert.occurrences > 1 ? ` · was seen ${alert.occurrences} times` : ''}
-                </p>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="email" className="flex flex-col gap-6">
+          <EmailNotifications />
+        </TabsContent>
+      </Tabs>
     </section>
   )
 }

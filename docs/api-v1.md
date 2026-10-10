@@ -136,7 +136,50 @@ raised again later as a fresh alert with its own history.
 The agent manages alerts through the `list_alerts`, `raise_alert`, `update_alert`, and
 `resolve_alert` tools, which call `backend/services/alerts.py` directly (`update_alert` edits an
 active alert's severity, title, or message without counting a new occurrence). There is no HTTP
-endpoint for creating alerts; the dashboard only reads, dismisses, and resolves them.
+endpoint for creating alerts; the dashboard only reads, dismisses, and resolves them. Raising an
+alert notifies no one by itself; the agent escalates critical conditions by email (see Email
+notifications below).
+
+## Email notifications
+
+The agent can email the farm's admins through its `send_email` tool, which calls
+`backend/services/emails.py` directly. The agent is prompt-guided to email only critical
+escalations and explicitly requested reports (for example a scheduled daily summary). SMTP
+credentials live in the server's `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, `SMTP_USE_TLS`) and are never exposed over HTTP; mail is always sent as
+`Leafy AI <SMTP_USERNAME>`, and sending stays disabled while `SMTP_HOST` or `SMTP_USERNAME` is
+empty. The Alerts page manages the admin recipient list and shows the send log; every send
+attempt is logged, including failures. There is no HTTP endpoint for composing emails besides the
+test endpoint. All endpoints require a session cookie.
+
+| Method   | Path                                         | Behavior                                                                                             |
+| -------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/notifications/recipients`           | List recipients, oldest first                                                                           |
+| `POST`   | `/api/v1/notifications/recipients`           | Add a recipient (`{ "email": "...", "label": "..." }`, label optional); duplicates return `409`         |
+| `PATCH`  | `/api/v1/notifications/recipients/{id}`      | Enable or disable a recipient (`{ "enabled": true }`); unknown ids return `404`                         |
+| `DELETE` | `/api/v1/notifications/recipients/{id}`      | Remove a recipient; returns `204 No Content`                                                            |
+| `GET`    | `/api/v1/notifications/emails`               | Email send log, most recent first; supports `limit` (1-100, default 50) and `offset`                    |
+| `POST`   | `/api/v1/notifications/emails/test`          | Send a test email to all enabled recipients; `503` when SMTP is unconfigured, `400` with no recipients  |
+
+```json
+[
+  {
+    "emailId": "64dbb326-2f52-4a51-a548-55a21e843b16",
+    "recipients": ["admin@example.com"],
+    "subject": "Water pH critically high",
+    "status": "sent",
+    "error": null,
+    "scheduleId": null,
+    "triggeredBy": "agent",
+    "createdAt": "2026-10-11T08:00:00Z"
+  }
+]
+```
+
+`status` is `sent` or `failed` (`error` carries the SMTP failure). `triggeredBy` is `"agent"` for
+the agent's `send_email` tool and `"user"` for test emails from the Alerts page. `scheduleId`
+records the scheduled run that triggered the send (`null` for interactive chat sends, test emails,
+or deleted schedules).
 
 ## Scheduled agent jobs
 

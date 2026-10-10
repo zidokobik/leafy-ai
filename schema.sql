@@ -58,6 +58,29 @@ CREATE TABLE public.alerts (
 );
 CREATE UNIQUE INDEX alerts_active_key_unique ON public.alerts (alert_key) WHERE status = 'active';
 CREATE INDEX alerts_status_updated_idx ON public.alerts (status, updated_at DESC);
+-- Email recipients for admin notifications, managed on the Alerts page. SMTP
+-- credentials live in .env, not in the database.
+CREATE TABLE public.email_recipients (
+  recipient_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE CHECK (length(trim(email)) > 0 AND length(email) <= 254 AND position('@' in email) > 1),
+  label text CHECK (label IS NULL OR length(label) <= 120),
+  enabled boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+-- Audit log of every admin email send attempt. The agent's send_email tool is
+-- prompt-guided to email only critical escalations and explicitly requested
+-- reports; `triggered_by` is 'user' for test emails sent from the Alerts page.
+CREATE TABLE public.email_logs (
+  email_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipients text[] NOT NULL,
+  subject text NOT NULL,
+  status text NOT NULL CHECK (status IN ('sent', 'failed')),
+  error text,
+  schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL,
+  triggered_by text NOT NULL CHECK (triggered_by IN ('agent', 'user')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX email_logs_created_idx ON public.email_logs (created_at DESC);
 CREATE TABLE public.sensor_data (
   timestamp_ms bigint NOT NULL DEFAULT ((EXTRACT(epoch FROM clock_timestamp()) * (1000)::numeric))::bigint,
   water_ph double precision,

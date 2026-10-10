@@ -29,6 +29,16 @@ class Settings(BaseSettings):
 	SUPABASE_SERVICE_KEY: SecretStr | None = None
 	CAMERA_BUCKET: str = "images"
 
+	# Outgoing email for admin notifications (critical alerts, requested reports).
+	# Sending is disabled while SMTP_HOST or SMTP_USERNAME is unset; mail is sent
+	# as "Leafy AI <SMTP_USERNAME>".
+	SMTP_HOST: str | None = None
+	SMTP_PORT: int = 587
+	SMTP_USERNAME: str | None = None
+	SMTP_PASSWORD: SecretStr | None = None
+	# Implicit TLS (port 465). When false, STARTTLS is negotiated if the server offers it.
+	SMTP_USE_TLS: bool = False
+
 	model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

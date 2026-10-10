@@ -42,8 +42,9 @@ def raise_alert_tool(schedule_id: UUID | None = None):
 		never append timestamps or counters. Re-raising updates the alert in place,
 		increments occurrences instead of duplicating, and resurfaces it if a user had
 		dismissed it. severity critical means a human must act now; warning means
-		developing problem; info is routine. Alerts notify no external systems.
-		Resolve with resolve_alert once the condition clears.
+		developing problem; info is routine. Raising an alert notifies no one by
+		itself; escalate critical conditions with send_email when a human must be
+		reached. Resolve with resolve_alert once the condition clears.
 		"""
 		async with AsyncSession(get_engine(), expire_on_commit=False) as session:
 			alert = await alert_service.raise_alert(

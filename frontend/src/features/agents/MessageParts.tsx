@@ -20,6 +20,7 @@ const toolLabels: Record<string, string> = {
   raise_alert: "Raising a dashboard alert",
   update_alert: "Updating a dashboard alert",
   resolve_alert: "Resolving a dashboard alert",
+  send_email: "Emailing the farm admins",
 };
 
 function isVisiblePart(part: MessagePart): boolean {
