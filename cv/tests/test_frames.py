@@ -1,7 +1,11 @@
 from datetime import datetime
 from pathlib import Path
 
-from leafy_cv.frames import list_frames, parse_frame_path
+import cv2
+import numpy as np
+import pytest
+
+from leafy_cv.frames import list_frames, parse_frame_path, read_image
 
 
 def test_parses_camera_and_time_from_file_name():
@@ -31,3 +35,17 @@ def test_lists_frames_sorted_and_skips_misfiled(tmp_path):
 		"level1_camera1_20260916_050025.jpg",
 	]
 	assert len(skipped) == 2
+
+
+def test_read_image_returns_the_pixels(tmp_path):
+	image = np.zeros((4, 6, 3), np.uint8)
+	image[1, 2] = (10, 20, 30)
+	cv2.imwrite(str(tmp_path / "a.png"), image)
+	assert (read_image(tmp_path / "a.png") == image).all()
+
+
+def test_read_image_says_which_file_is_missing_or_corrupt(tmp_path):
+	(tmp_path / "empty.jpg").write_bytes(b"")
+	for path in (tmp_path / "missing.jpg", tmp_path / "empty.jpg"):
+		with pytest.raises(FileNotFoundError, match=path.name):
+			read_image(path)

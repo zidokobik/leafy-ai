@@ -47,7 +47,7 @@ Closure counts every gap, including gaps along a channel that expansion doesn't 
 """
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -90,7 +90,6 @@ class FrameMeasure:
 	zones: dict[str, float]  # zone name -> closure
 	plant_mask: np.ndarray  # (height, width) bool: union of the kept outlines
 	runtime_ms: int
-	outlines: list[np.ndarray | None] = field(default_factory=list)  # kept outline per hole
 
 
 def choose_outline(result: PointMasks, probabilities: np.ndarray, cell_area: int, threshold: float) -> tuple[int, str]:
@@ -182,14 +181,14 @@ def measure_frame(
 	plant_mask = np.zeros((height, width), bool)
 	for outline in chosen:
 		if outline is not None:
-			assert outline.shape == plant_mask.shape, "MobileSAM outline and frame differ in size"
+			if outline.shape != plant_mask.shape:
+				raise ValueError(f"MobileSAM outline is {outline.shape}, the frame {plant_mask.shape}")
 			plant_mask |= outline
 
 	contacts = pair_contact(plant_mask, cells)
 	holes = []
 	for i, hole in enumerate(hole_map.holes):
-		cell = cells.labels == i
-		assert cell.shape == plant_mask.shape
+		cell = cells.cell(i)
 		k, flag = flags[i]
 		holes.append(
 			HoleMeasure(
@@ -205,7 +204,7 @@ def measure_frame(
 
 	zones = zone_closure(image_bgr, layers, hole_map, segmenter, plant_filter)
 	runtime_ms = int((time.perf_counter() - start) * 1000)
-	return FrameMeasure(holes=holes, zones=zones, plant_mask=plant_mask, runtime_ms=runtime_ms, outlines=chosen)
+	return FrameMeasure(holes=holes, zones=zones, plant_mask=plant_mask, runtime_ms=runtime_ms)
 
 
 def line_closed(on_plant: np.ndarray, min_run: int) -> bool:

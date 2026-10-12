@@ -87,19 +87,19 @@ def main() -> None:
 	if counts["mixed"] / max(len(answers), 1) > 0.15:
 		print("  Note: over 15% mixed. MobileSAM often outlines plant and board together; check the prompts.")
 
-	packed = np.load(args.dir / "masks.npz")
 	images, masks, rows, features = {}, {}, [], []
-	for answer in used:
-		row = {**candidates[answer["candidate_id"]], "label": answer["label"]}
-		if row["file"] not in images:
-			image = cv2.imread(str(args.frames_root / row["camera_id"] / row["file"]))
-			if image is None:
-				raise SystemExit(f"Could not read {row['file']}; check --frames-root")
-			images[row["file"]] = image
-		mask = unpack_masks(packed[row["candidate_id"]], int(row["width"]))[int(row["best"])]
-		masks[row["candidate_id"]] = mask
-		features.append(mask_features(images[row["file"]], mask))
-		rows.append(row)
+	with np.load(args.dir / "masks.npz") as packed:
+		for answer in used:
+			row = {**candidates[answer["candidate_id"]], "label": answer["label"]}
+			if row["file"] not in images:
+				image = cv2.imread(str(args.frames_root / row["camera_id"] / row["file"]))
+				if image is None:
+					raise SystemExit(f"Could not read {row['file']}; check --frames-root")
+				images[row["file"]] = image
+			mask = unpack_masks(packed[row["candidate_id"]], int(row["width"]))[int(row["best"])]
+			masks[row["candidate_id"]] = mask
+			features.append(mask_features(images[row["file"]], mask))
+			rows.append(row)
 	x = np.array(features)
 	y = np.array([row["label"] == "plant" for row in rows])
 	groups = np.array([row["file"] for row in rows])

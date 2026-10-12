@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 FILENAME_PATTERN = re.compile(r"^(?P<camera>level\d+_camera\d+)_(?P<date>\d{8})_(?P<time>\d{6})\.jpg$")
 
 
@@ -44,3 +47,12 @@ def list_frames(frames_root: Path) -> tuple[dict[str, list[Frame]], list[Path]]:
 	for frames in by_camera.values():
 		frames.sort(key=lambda frame: frame.captured_at)
 	return by_camera, skipped
+
+
+def read_image(path: Path) -> np.ndarray:
+	"""The image at path (BGR). cv2.imread returns None for a missing or unreadable file; this says so instead of
+	failing later with an unrelated error."""
+	image = cv2.imread(str(path))
+	if image is None:
+		raise FileNotFoundError(f"Could not read the image {path} (missing or corrupt)")
+	return image

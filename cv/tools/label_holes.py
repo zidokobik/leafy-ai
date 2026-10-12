@@ -40,10 +40,10 @@ DOT_RADIUS = 4  # px in the close-up
 def render(image: np.ndarray, hole_map: HoleMap, cells, hole_index: int, status: str) -> np.ndarray:
 	height, width = image.shape[:2]
 	hole = hole_map.holes[hole_index]
-	region = (cells.labels == hole_index) | cells.corridors[hole_index]
+	region = cells.cell(hole_index) | cells.corridors[hole_index]
 	partners = [hole_map.holes[j] for j in cells.partners(hole_index)]  # both directions (12 Oct)
 	for j in cells.partners(hole_index):
-		region |= cells.labels == j
+		region |= cells.cell(j)
 	ys, xs = np.nonzero(region)
 	pad = int(0.4 * cells.spacing[hole_index])
 	x0, y0 = max(0, xs.min() - pad), max(0, ys.min() - pad)

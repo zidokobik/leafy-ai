@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import pytest
 
-from leafy_cv.segment import DEFAULT_WEIGHTS, PAD_LABEL, build_prompts
+from leafy_cv.segment import DEFAULT_WEIGHTS, PAD_LABEL, Segmenter, build_prompts, file_sha256
 
 
 def test_prompts_put_the_point_first_then_its_negatives_then_padding():
@@ -25,10 +25,20 @@ def test_negatives_must_match_points():
 		build_prompts(np.array([[1, 2]]), [[], []])
 
 
+def test_file_sha256(tmp_path):
+	(tmp_path / "f").write_bytes(b"abc")
+	assert file_sha256(tmp_path / "f") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+
+def test_segmenter_refuses_a_weights_file_that_is_not_the_known_one(tmp_path):
+	# checked before torch loads (unpickles) it
+	(tmp_path / "mobile_sam.pt").write_bytes(b"not the real weights")
+	with pytest.raises(ValueError, match="not the expected MobileSAM file"):
+		Segmenter(tmp_path / "mobile_sam.pt")
+
+
 @pytest.mark.skipif(not DEFAULT_WEIGHTS.exists(), reason="MobileSAM weights not downloaded")
 def test_mobilesam_outlines_a_green_disk():
-	from leafy_cv.segment import Segmenter
-
 	image = np.full((256, 256, 3), 230, np.uint8)
 	cv2.circle(image, (128, 128), 50, (60, 160, 70), -1)
 	truth = np.zeros((256, 256), np.uint8)

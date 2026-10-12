@@ -20,9 +20,10 @@ uv run python tools/build_frame_index.py --frames-root E:\Claude
 ```
 
 It takes about 1 s per frame and needs `trained/plant_filter.json` (step 3). Run it over **all** frames since
-the first one (periods are numbered from the first frame), and back up `data/periods.csv` first: the rebuild
-writes it again with empty notes, so copy the notes back. Each frame is checked two
-ways against the last trusted frame:
+the first one (periods are numbered from the first frame). It refuses to replace an existing `data/frame_index.csv`
+or `data/periods.csv` unless you add `--overwrite`: the current ones were corrected by hand on 11 Oct (tracked in
+git), so back them up first. The rebuild writes `periods.csv` again with empty notes, so copy the notes back.
+Each frame is checked two ways against the last trusted frame:
 
 - **Has the camera moved?** Corners are matched only on each camera's fixed parts (frame rails, walls,
   light bar), listed in `config/fixed_parts.json`, so growing leaves can't fake a move. If a camera is

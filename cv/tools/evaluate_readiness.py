@@ -160,9 +160,11 @@ def main() -> None:
 		part = [r for r in rows if r["camera_id"] == camera]
 		cv_empty = [r for r in part if r["status"] == "empty"]
 		said_empty = [r for r in part if r["label"] == "empty"]
+		human_empty_of_cv = sum(r["label"] == "empty" for r in cv_empty)
+		cv_empty_of_human = sum(r["status"] == "empty" for r in said_empty)
 		print(
-			f"{camera}: CV empty {len(cv_empty)}, of which human 'empty' {sum(r['label'] == 'empty' for r in cv_empty)}; "
-			f"human 'empty' {len(said_empty)}, of which CV empty {sum(r['status'] == 'empty' for r in said_empty)}"
+			f"{camera}: CV empty {len(cv_empty)}, of which human 'empty' {human_empty_of_cv}; "
+			f"human 'empty' {len(said_empty)}, of which CV empty {cv_empty_of_human}"
 		)
 
 	dev = [r for r in rows if r["split"] == "dev" and r["label"] in ("crowded", "not_crowded")]

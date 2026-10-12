@@ -28,3 +28,11 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/leafy_cv"]
+
+# Same settings as the repo root (kept here so cv/ also lints on its own)
+[tool.ruff]
+line-length = 120
+src = ["src"]  # leafy_cv is our own package (import sorting)
+
+[tool.ruff.format]
+indent-style = "tab"

@@ -77,6 +77,7 @@ MIN_DOT_DISTANCE_FACTOR = 0.3
 # Below this share of its reach inside the frame, it is measured but left out of readiness
 # decisions and evaluation (camera 2 P2: row 6 at 56-94%, right-edge holes at 73-80%).
 MIN_IN_FRAME = 0.85
+IN_FRAME_SAMPLES = 41  # grid points across a disk when measuring its in-frame share
 CHANNEL_AXES = ("row", "col")
 
 
@@ -203,13 +204,13 @@ def row_problems(hole_map: HoleMap) -> list[str]:
 	problems = []
 	centres = np.array([(h.x, h.y) for h in hole_map.holes], dtype=np.float64)
 	if len(centres) >= 2:
-		pairwise = np.linalg.norm(centres[:, None] - centres[None, :], axis=2)
-		np.fill_diagonal(pairwise, np.inf)
-		spacing = np.sort(pairwise, axis=1)[:, : min(2, len(centres) - 1)].mean(axis=1)
-		for i, j in zip(*np.nonzero(pairwise < MIN_DOT_DISTANCE_FACTOR * spacing[:, None]), strict=True):
+		distances = np.linalg.norm(centres[:, None] - centres[None, :], axis=2)
+		np.fill_diagonal(distances, np.inf)
+		spacing = np.sort(distances, axis=1)[:, : min(2, len(centres) - 1)].mean(axis=1)
+		for i, j in zip(*np.nonzero(distances < MIN_DOT_DISTANCE_FACTOR * spacing[:, None]), strict=True):
 			if i < j:
 				a, b = hole_map.holes[i], hole_map.holes[j]
-				problems.append(f"{a.hole_id} and {b.hole_id} are only {pairwise[i, j]:.0f} px apart (clicked twice?)")
+				problems.append(f"{a.hole_id} and {b.hole_id} are only {distances[i, j]:.0f} px apart (clicked twice?)")
 
 	for row in sorted({h.row for h in hole_map.holes}):
 		points = np.array([(h.x, h.y) for h in hole_map.holes if h.row == row], dtype=np.float64)
@@ -292,9 +293,9 @@ class Cells:
 		return self.in_frame >= MIN_IN_FRAME
 
 
-def in_frame_share(centres: np.ndarray, radii: np.ndarray, width: int, height: int, samples: int = 41) -> np.ndarray:
+def in_frame_share(centres: np.ndarray, radii: np.ndarray, width: int, height: int) -> np.ndarray:
 	"""Share of each disk (centre, radius) that lies inside a width x height frame."""
-	offsets = np.linspace(-1.0, 1.0, samples)
+	offsets = np.linspace(-1.0, 1.0, IN_FRAME_SAMPLES)
 	grid_x, grid_y = np.meshgrid(offsets, offsets)
 	inside_disk = grid_x**2 + grid_y**2 <= 1.0
 	unit = np.stack([grid_x[inside_disk], grid_y[inside_disk]], axis=1)  # points of a unit disk
@@ -322,9 +323,9 @@ def build_cells(hole_map: HoleMap) -> Cells:
 	centres = np.array([(h.x, h.y) for h in holes], dtype=np.float32)
 
 	# Local spacing = mean distance to the two nearest other holes.
-	pairwise = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2)
-	np.fill_diagonal(pairwise, np.inf)
-	spacing = np.sort(pairwise, axis=1)[:, :2].mean(axis=1)
+	distances = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2)
+	np.fill_diagonal(distances, np.inf)
+	spacing = np.sort(distances, axis=1)[:, :2].mean(axis=1)
 
 	# Nearest hole for every pixel, in row chunks to keep memory small.
 	labels = np.empty((height, width), dtype=np.int32)
@@ -354,7 +355,7 @@ def build_cells(hole_map: HoleMap) -> Cells:
 	channels = np.array([hole_map.channel(h) for h in holes])
 	facing = cross_channel_neighbours(centres, channels)
 	cross = [set(f) for f in facing]
-	along = along_channel_spacing(centres, channels, pairwise)
+	along = along_channel_spacing(centres, channels, distances)
 	# a pair is kept if either hole picked the other (the facing rule isn't symmetric under perspective)
 	pairs = sorted({(min(i, j), max(i, j)) for i in range(len(holes)) for j in cross[i]})
 	for i, j in pairs:
@@ -440,45 +441,45 @@ def cross_channel_neighbours(centres: np.ndarray, channels: np.ndarray) -> list[
 	Channel numbers are rows or columns, which are numbered in order across the board, so +-1 is the
 	channel next to it.
 	"""
-	pairwise = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2).astype(np.float64)
-	np.fill_diagonal(pairwise, np.inf)
-	along = along_channel_spacing(centres, channels, pairwise)
+	distances = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2).astype(np.float64)
+	np.fill_diagonal(distances, np.inf)
+	along = along_channel_spacing(centres, channels, distances)
 	cross: list[set[int]] = [set() for _ in centres]
 	for i in range(len(centres)):
-		direction = channel_direction(centres, channels, pairwise, i)
+		direction = channel_direction(centres, channels, distances, i)
 		for other in (channels[i] - 1, channels[i] + 1):
 			theirs = np.nonzero(channels == other)[0]
 			if len(theirs) == 0:
 				continue
-			nearest_k = int(np.argmin(pairwise[i, theirs]))
-			nearest = pairwise[i, theirs[nearest_k]]
+			nearest_k = int(np.argmin(distances[i, theirs]))
+			nearest = distances[i, theirs[nearest_k]]
 			if nearest > MAX_CROSS_VS_ALONG * along[i]:
 				continue
 			cross[i].add(int(theirs[nearest_k]))
 			for j in theirs:
 				offset = abs(float((centres[j] - centres[i]) @ direction)) if direction is not None else 0.0
-				if pairwise[i, j] <= CROSS_NEIGHBOUR_FACTOR * nearest and offset <= FACING_OFFSET * along[i]:
+				if distances[i, j] <= CROSS_NEIGHBOUR_FACTOR * nearest and offset <= FACING_OFFSET * along[i]:
 					cross[i].add(int(j))
 	return cross
 
 
-def channel_direction(centres: np.ndarray, channels: np.ndarray, pairwise: np.ndarray, i: int) -> np.ndarray | None:
+def channel_direction(centres: np.ndarray, channels: np.ndarray, distances: np.ndarray, i: int) -> np.ndarray | None:
 	"""Unit vector along hole i's channel (towards its nearest same-channel hole), None if it is alone."""
 	same = np.nonzero((channels == channels[i]) & (np.arange(len(centres)) != i))[0]
 	if len(same) == 0:
 		return None
-	j = same[np.argmin(pairwise[i, same])]
+	j = same[np.argmin(distances[i, same])]
 	vector = (centres[j] - centres[i]).astype(np.float64)
 	return vector / np.linalg.norm(vector)
 
 
-def along_channel_spacing(centres: np.ndarray, channels: np.ndarray, pairwise: np.ndarray) -> np.ndarray:
+def along_channel_spacing(centres: np.ndarray, channels: np.ndarray, distances: np.ndarray) -> np.ndarray:
 	"""(n,) distance to the nearest hole in the same channel; for a hole alone in its channel, the
 	distance to its nearest hole at all."""
 	along = np.empty(len(centres))
 	for i in range(len(centres)):
 		same = (channels == channels[i]) & (np.arange(len(centres)) != i)
-		along[i] = pairwise[i, same].min() if same.any() else pairwise[i].min()
+		along[i] = distances[i, same].min() if same.any() else distances[i].min()
 	return along
 
 
@@ -511,7 +512,7 @@ def corridor_lines(a: np.ndarray, b: np.ndarray, corridor_width: float, shape: t
 	return lines
 
 
-def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells, label_every: int = 1) -> np.ndarray:
+def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells) -> np.ndarray:
 	"""Zones outlined in white, cells tinted by row, gap corridors darker, centres and short ids on top.
 
 	Holes left out of decisions (mostly outside the frame) get a red ring and a trailing "x".
@@ -529,8 +530,9 @@ def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells, label_e
 	tint = out.copy()
 	for i, hole in enumerate(hole_map.holes):
 		colour = palette[(hole.row - 1) % len(palette)]
-		tint[cells.labels == i] = colour
-		tint[cells.corridors[i] & (cells.labels == i)] = tuple(int(c * 0.55) for c in colour)
+		cell = cells.cell(i)
+		tint[cell] = colour
+		tint[cells.corridors[i] & cell] = tuple(int(c * 0.55) for c in colour)
 	has_cell = cells.labels >= 0
 	out[has_cell] = (0.55 * out[has_cell] + 0.45 * tint[has_cell]).astype(np.uint8)
 
@@ -545,8 +547,7 @@ def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells, label_e
 		cv2.circle(out, centre, 3, (0, 255, 255) if not hole.estimated else (0, 140, 255), -1)
 		if not cells.reliable[i]:
 			cv2.circle(out, centre, 8, (0, 0, 255), 2)
-		if i % label_every == 0:
-			text = f"R{hole.row}H{hole.col}" + ("" if cells.reliable[i] else " x")
-			cv2.putText(out, text, (centre[0] + 5, centre[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 3)
-			cv2.putText(out, text, (centre[0] + 5, centre[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1)
+		text = f"R{hole.row}H{hole.col}" + ("" if cells.reliable[i] else " x")
+		cv2.putText(out, text, (centre[0] + 5, centre[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 3)
+		cv2.putText(out, text, (centre[0] + 5, centre[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1)
 	return out

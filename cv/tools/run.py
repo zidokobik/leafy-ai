@@ -32,9 +32,9 @@ import numpy as np
 
 import leafy_cv.hole_map as hole_map_module
 import leafy_cv.metrics as metrics_module
-from leafy_cv.frames import parse_frame_path
+from leafy_cv.frames import parse_frame_path, read_image
 from leafy_cv.hole_map import ACROSS, ALONG, HoleMap, build_cells, zone_mask
-from leafy_cv.metrics import hole_contact, measure_frame, pair_contact
+from leafy_cv.metrics import draw_plant_outline, hole_contact, measure_frame, pair_contact
 from leafy_cv.plant_filter import PlantFilter, pack_masks, unpack_masks
 from leafy_cv.readiness import (
 	CANDIDATE,
@@ -134,11 +134,11 @@ def layout_problems(index_csv: Path, frames_root: Path, hole_map: HoleMap, maps_
 	"""What would make this run's statuses silently out of date: (problems, refuse this map).
 
 	- Frames on disk newer than the frame index, for a map still open (valid_to unset): tray changes among
-	  them haven't been looked for, so the run is refused until the index is rebuilt
-	  (tools/build_frame_index.py). A closed map can't get new frames, so it still runs.
+		them haven't been looked for, so the run is refused until the index is rebuilt
+		(tools/build_frame_index.py). A closed map can't get new frames, so it still runs.
 	- A later period (new layout or camera move found by the index) with no hole map: its frames are
-	  never measured with the old map (pick_frames keeps the map's own period), but the newest statuses
-	  then stop at the change, so it is reported. 8 Oct: the guard before the frames after 3 Oct arrive.
+		never measured with the old map (pick_frames keeps the map's own period), but the newest statuses
+		then stop at the change, so it is reported. 8 Oct: the guard before the frames after 3 Oct arrive.
 	"""
 	with open(index_csv, encoding="utf-8") as handle:
 		rows = sorted(
@@ -208,10 +208,6 @@ def load_plant_pixels(path: Path, made_with: str, width: int) -> np.ndarray:
 		return unpack_masks(data["plant"][None], width)[0]
 
 
-def as_float(value: str) -> float | None:
-	return None if value in ("", None) else float(value)
-
-
 def draw_frame(image, hole_map, cells, plant_mask, rows_by_id, zone_rows, contacts) -> np.ndarray:
 	"""Cells tinted by status, plant pixels outlined, a line between each pair of plants, in the same channel
 	and across channels (white = open, red = leaves meet along the whole corridor), numbers per hole
@@ -219,7 +215,7 @@ def draw_frame(image, hole_map, cells, plant_mask, rows_by_id, zone_rows, contac
 	out = image.copy()
 	tint = out.copy()
 	for i, hole in enumerate(hole_map.holes):
-		tint[cells.labels == i] = STATUS_COLOURS[rows_by_id[hole.hole_id]["status"]]
+		tint[cells.cell(i)] = STATUS_COLOURS[rows_by_id[hole.hole_id]["status"]]
 	has_cell = cells.labels >= 0
 	out[has_cell] = (0.6 * out[has_cell] + 0.4 * tint[has_cell]).astype(np.uint8)
 	for zone in hole_map.zones:
@@ -238,8 +234,7 @@ def draw_frame(image, hole_map, cells, plant_mask, rows_by_id, zone_rows, contac
 		colour = tuple(int(c) for c in (1 - share) * np.array((255, 255, 255)) + share * np.array((40, 40, 230)))
 		a, b = hole_map.holes[i], hole_map.holes[j]
 		cv2.line(out, (int(a.x), int(a.y)), (int(b.x), int(b.y)), colour, 2 if share >= 0.5 else 1)
-	contours, _ = cv2.findContours(plant_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-	cv2.drawContours(out, contours, -1, (255, 255, 0), 1)
+	out = draw_plant_outline(out, plant_mask, (255, 255, 0))
 	for hole in hole_map.holes:
 		row = rows_by_id[hole.hole_id]
 		contact = "-" if row["boundary_contact"] == "" else f"{float(row['boundary_contact']) * 100:.0f}"
@@ -322,7 +317,7 @@ def run_map(args, map_path: Path, plant_filter: PlantFilter, filter_hash: str, s
 			from leafy_cv.segment import Segmenter
 
 			segmenter_box.append(Segmenter(threads=args.threads))
-		image = cv2.imread(str(args.frames_root / hole_map.camera_id / frame["file"]))
+		image = read_image(args.frames_root / hole_map.camera_id / frame["file"])
 		measure = measure_frame(image, hole_map, cells, segmenter_box[0], plant_filter)
 		rows = []
 		for h in measure.holes:
@@ -442,7 +437,7 @@ def run_map(args, map_path: Path, plant_filter: PlantFilter, filter_hash: str, s
 			by_file[row["image_id"]].append(row)
 		picks = frames if args.overlays == "all" else daily_picks(frames)
 		for frame in picks:
-			image = cv2.imread(str(args.frames_root / hole_map.camera_id / frame["file"]))
+			image = read_image(args.frames_root / hole_map.camera_id / frame["file"])
 			plant_mask = load_plant_pixels(pixels_path(out_dir, frame["file"]), pixels_made_with, image.shape[1])
 			rows = by_file[frame["file"]]
 			rows_by_id = {r["hole_id"]: r for r in rows if r["kind"] == "hole"}

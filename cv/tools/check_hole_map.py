@@ -16,6 +16,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from leafy_cv.frames import read_image
 from leafy_cv.hole_map import (
 	ACROSS,
 	ALONG,
@@ -121,7 +122,7 @@ def main() -> None:
 	picks = [files[0], files[len(files) // 2], files[-1]]
 	panels = []
 	for name in picks:
-		image = cv2.imread(str(args.frames_root / hole_map.camera_id / name))
+		image = read_image(args.frames_root / hole_map.camera_id / name)
 		panel = draw_overlay(image, hole_map, cells)
 		cv2.putText(panel, name, (8, panel.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
 		cv2.putText(panel, name, (8, panel.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)

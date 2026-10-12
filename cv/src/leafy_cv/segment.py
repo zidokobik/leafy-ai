@@ -11,6 +11,7 @@ torch and mobile_sam are imported only when a Segmenter is created, so the rest 
 works without them.
 """
 
+import hashlib
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -61,6 +62,15 @@ def build_prompts(points: np.ndarray, negatives: list[list[int]] | None = None) 
 	return coords, labels
 
 
+def file_sha256(path: Path) -> str:
+	"""SHA-256 of a file, read in 1 MB chunks."""
+	digest = hashlib.sha256()
+	with open(path, "rb") as handle:
+		for chunk in iter(lambda: handle.read(1 << 20), b""):
+			digest.update(chunk)
+	return digest.hexdigest()
+
+
 class Segmenter:
 	"""MobileSAM on CPU. Call set_image once per frame, then predict for any number of points."""
 
@@ -68,6 +78,12 @@ class Segmenter:
 		weights = Path(weights)
 		if not weights.exists():
 			raise FileNotFoundError(f"{weights} not found: run `uv run python tools/download_weights.py` first")
+		# the file is unpickled by torch.load, so only the known file is loaded (older torch versions would run code
+		# from a replaced file)
+		if file_sha256(weights) != WEIGHTS_SHA256:
+			raise ValueError(
+				f"{weights} is not the expected MobileSAM file: run `uv run python tools/download_weights.py`"
+			)
 		with warnings.catch_warnings():
 			warnings.simplefilter("ignore")  # timm deprecation notices from inside mobile_sam
 			import torch

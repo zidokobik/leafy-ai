@@ -58,7 +58,6 @@ RULE_VERSION = "rule-v5"  # v3 (8 Oct): zones smoothed like holes; v4: lower val
 # v5 (12 Oct): contact in both directions (same channel and next channel); thresholds unchanged
 
 EMPTY, GROWING, CANDIDATE, READY, UNCERTAIN = "empty", "growing", "candidate", "ready", "uncertain"
-STATUSES = (EMPTY, GROWING, CANDIDATE, READY, UNCERTAIN)
 
 
 @dataclass(frozen=True)
@@ -82,10 +81,8 @@ def rolling_median(values: Sequence[float | None], frames: int) -> list[float | 
 def hole_statuses(
 	coverage: Sequence[float],
 	contact: Sequence[float | None],
+	*,
 	reliable: bool = True,
-	contact_crowded: float = CONTACT_CROWDED,
-	empty_coverage: float = EMPTY_COVERAGE,
-	confirm_frames: int = CONFIRM_FRAMES,
 	smooth_frames: int = SMOOTH_FRAMES,
 ) -> list[Status]:
 	"""Statuses of one hole over its usable frames, oldest first."""
@@ -99,21 +96,20 @@ def hole_statuses(
 			out.append(Status(UNCERTAIN, 0))
 			streak, crowded = 0, False
 			continue
-		if cov < empty_coverage:
+		if cov < EMPTY_COVERAGE:
 			out.append(Status(EMPTY, 0))
 			streak, crowded = 0, False
 			continue
-		crowded = touch >= (contact_crowded - HYSTERESIS if crowded else contact_crowded)
+		crowded = touch >= (CONTACT_CROWDED - HYSTERESIS if crowded else CONTACT_CROWDED)
 		streak = streak + 1 if crowded else 0
-		status = (READY if streak >= confirm_frames else CANDIDATE) if crowded else GROWING
+		status = (READY if streak >= CONFIRM_FRAMES else CANDIDATE) if crowded else GROWING
 		out.append(Status(status, streak))
 	return out
 
 
 def zone_statuses(
 	closure: Sequence[float],
-	zone_closed: float = ZONE_CLOSED,
-	confirm_frames: int = CONFIRM_FRAMES,
+	*,
 	smooth_frames: int = SMOOTH_FRAMES,
 ) -> list[Status]:
 	"""Statuses of one zone over its usable frames, oldest first: a closed canopy is crowded.
@@ -128,9 +124,9 @@ def zone_statuses(
 			out.append(Status(UNCERTAIN, 0))
 			streak, closed = 0, False
 			continue
-		closed = value >= (zone_closed - HYSTERESIS if closed else zone_closed)
+		closed = value >= (ZONE_CLOSED - HYSTERESIS if closed else ZONE_CLOSED)
 		streak = streak + 1 if closed else 0
-		status = (READY if streak >= confirm_frames else CANDIDATE) if closed else GROWING
+		status = (READY if streak >= CONFIRM_FRAMES else CANDIDATE) if closed else GROWING
 		out.append(Status(status, streak))
 	return out
 

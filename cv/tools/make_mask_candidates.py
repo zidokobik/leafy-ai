@@ -19,9 +19,9 @@ import csv
 from datetime import datetime
 from pathlib import Path
 
-import cv2
 import numpy as np
 
+from leafy_cv.frames import read_image
 from leafy_cv.hole_map import HoleMap, build_cells
 from leafy_cv.plant_filter import MIN_MASK_PIXELS, pack_masks
 from leafy_cv.segment import Segmenter
@@ -106,7 +106,7 @@ def main() -> None:
 
 	rows, packed = [], {}
 	for n, pick in enumerate(picks, start=1):
-		image = cv2.imread(str(args.frames_root / pick["camera_id"] / pick["file"]))
+		image = read_image(args.frames_root / pick["camera_id"] / pick["file"])
 		height, width = image.shape[:2]
 		hole_map = find_hole_map(hole_maps, pick["camera_id"], pick["when"])
 		if hole_map is not None:

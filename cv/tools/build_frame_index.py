@@ -10,6 +10,9 @@ Writes:
 
 Uses config/fixed_parts.json (where each camera's fixed parts are) and
 trained/plant_filter.json (to see where the plants are). About 1 s per frame.
+
+Refuses to replace an existing frame_index.csv / periods.csv unless --overwrite is given: the current ones were
+corrected by hand on 11 Oct (the tool can't recreate those corrections). Back them up first.
 """
 
 import argparse
@@ -22,7 +25,7 @@ import numpy as np
 
 from leafy_cv.drift import DEFAULT_FIXED_PARTS, Alignment, align, extract_features, load_fixed_parts
 from leafy_cv.frame_index import OK, USABLE_STATUSES, label_sequence
-from leafy_cv.frames import Frame, list_frames
+from leafy_cv.frames import Frame, list_frames, read_image
 from leafy_cv.plant_filter import PlantFilter
 from leafy_cv.scene import plant_change, plant_cover, plant_tiles
 
@@ -32,7 +35,7 @@ DEFAULT_PLANT_FILTER = Path(__file__).resolve().parents[1] / "trained" / "plant_
 def save_event_image(before: Frame, after: Frame, status: str, detail: str, out_dir: Path) -> None:
 	images = []
 	for frame, title in ((before, "compared with"), (after, status)):
-		image = cv2.imread(str(frame.path))
+		image = read_image(frame.path)
 		text = f"{title}: {frame.captured_at:%d %b %H:%M}"
 		cv2.putText(image, text, (10, image.shape[0] - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4)
 		cv2.putText(image, text, (10, image.shape[0] - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
@@ -51,7 +54,18 @@ def main() -> None:
 	parser.add_argument("--fixed-parts", type=Path, default=DEFAULT_FIXED_PARTS)
 	parser.add_argument("--plant-filter", type=Path, default=DEFAULT_PLANT_FILTER)
 	parser.add_argument("--no-event-images", action="store_true")
+	parser.add_argument(
+		"--overwrite",
+		action="store_true",
+		help="replace an existing frame_index.csv / periods.csv (back them up first)",
+	)
 	args = parser.parse_args()
+	existing = [args.out_dir / name for name in ("frame_index.csv", "periods.csv") if (args.out_dir / name).exists()]
+	if existing and not args.overwrite:
+		raise SystemExit(
+			f"{', '.join(str(p) for p in existing)} already exist (the current ones were corrected by hand on 11 Oct). "
+			"Back them up and pass --overwrite to rebuild, or use another --out-dir."
+		)
 
 	fixed_parts = load_fixed_parts(args.fixed_parts)
 	plant_filter = PlantFilter.load(args.plant_filter)
@@ -70,7 +84,7 @@ def main() -> None:
 		print(f"{camera_id}: {len(frames)} frames, finding fixed-part corners and plants ...", flush=True)
 		features, tiles = [], []
 		for frame in frames:
-			image = cv2.imread(str(frame.path))
+			image = read_image(frame.path)
 			features.append(extract_features(image, regions))
 			tiles.append(plant_tiles(image, plant_filter))
 		first_of_day = [
