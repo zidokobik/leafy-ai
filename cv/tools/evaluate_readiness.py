@@ -26,11 +26,13 @@ import argparse
 import csv
 import math
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 
-from leafy_cv.csv_files import write_csv
+from leafy_cv.csv_files import read_observations, write_csv
 from leafy_cv.readiness import CANDIDATE, EMPTY, GROWING, READY
 
 STATUSES = (READY, CANDIDATE, GROWING, EMPTY)
@@ -49,14 +51,21 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 	return max(0.0, centre - half), min(1.0, centre + half)
 
 
-def weighted_catch(crowded: dict[str, int], weights: dict[str, float], caught: tuple[str, ...]) -> float:
-	"""Share of crowded plants (weighted to the population) whose status is in `caught`."""
-	total = sum(weights.get(s, 0.0) * n for s, n in crowded.items())
-	hit = sum(weights.get(s, 0.0) * n for s, n in crowded.items() if s in caught)
+def share_caught(weighted: dict[str, float], caught: tuple[str, ...]) -> float:
+	"""Share of the (already weighted) crowded plants per status that falls in the `caught` statuses."""
+	total = sum(weighted.values())
+	hit = sum(amount for status, amount in weighted.items() if status in caught)
 	return hit / total if total else float("nan")
 
 
-def catch_interval(rows: list[dict], weights: dict[str, float], caught: tuple[str, ...], seed: int = 0):
+def weighted_catch(crowded: dict[str, int], weights: dict[str, float], caught: tuple[str, ...]) -> float:
+	"""Share of crowded plants (weighted to the population) whose status is in `caught`."""
+	return share_caught({s: weights.get(s, 0.0) * n for s, n in crowded.items()}, caught)
+
+
+def catch_interval(
+	rows: list[dict], weights: dict[str, float], caught: tuple[str, ...], seed: int = 0
+) -> tuple[float, float]:
 	"""95% interval of weighted_catch: each status's crowded share drawn from its Jeffreys Beta(k+0.5, n-k+0.5)
 	(so a status where every crop agreed still carries its uncertainty), then weighted as in weighted_catch."""
 	rng = np.random.default_rng(seed)
@@ -67,27 +76,49 @@ def catch_interval(rows: list[dict], weights: dict[str, float], caught: tuple[st
 	values = []
 	for _ in range(BOOTSTRAP):
 		share = {s: rng.beta(k + 0.5, n - k + 0.5) for s, (k, n) in counts.items()}
-		total = sum(weights.get(s, 0.0) * counts[s][1] * share[s] for s in counts)
-		hit = sum(weights.get(s, 0.0) * counts[s][1] * share[s] for s in counts if s in caught)
-		values.append(hit / total if total else float("nan"))
+		values.append(share_caught({s: weights.get(s, 0.0) * counts[s][1] * share[s] for s in counts}, caught))
 	return tuple(np.nanpercentile(values, [2.5, 97.5]))
 
 
-def camera_report(rows: list[dict], weights: dict[str, float]) -> dict:
+class StatusShare(NamedTuple):
+	"""Of the crops with one CV status: how many a human called crowded, out of how many, with a 95% interval."""
+
+	crowded: int
+	crops: int
+	low: float
+	high: float
+
+
+@dataclass(frozen=True)
+class CameraReport:
+	"""The numbers for one camera."""
+
+	status: dict[str, StatusShare]  # per CV status
+	caught: int  # crowded plants the CV had `ready` (the grower alert)
+	candidate: int  # crowded plants the CV had `candidate`
+	missed: int  # crowded plants the CV had growing or empty (no alert)
+	catch: float  # share of crowded plants caught, weighted to the population
+	catch_ci: tuple[float, float]
+	catch_with_candidate: float
+
+
+def camera_report(rows: list[dict], weights: dict[str, float]) -> CameraReport:
 	"""Numbers for one camera: rows are its judged crops (label crowded / not_crowded)."""
-	out = {"status": {}}
-	for status in STATUSES:
-		part = [r for r in rows if r["status"] == status]
+	status = {}
+	for name in STATUSES:
+		part = [r for r in rows if r["status"] == name]
 		k = sum(r["label"] == "crowded" for r in part)
-		out["status"][status] = (k, len(part), *wilson(k, len(part)))
+		status[name] = StatusShare(k, len(part), *wilson(k, len(part)))
 	crowded = Counter(r["status"] for r in rows if r["label"] == "crowded")
-	out["caught"] = crowded[READY]
-	out["candidate"] = crowded[CANDIDATE]
-	out["missed"] = sum(crowded[s] for s in MISSED)
-	out["catch"] = weighted_catch(dict(crowded), weights, (READY,))
-	out["catch_ci"] = catch_interval(rows, weights, (READY,))
-	out["catch_with_candidate"] = weighted_catch(dict(crowded), weights, (READY, CANDIDATE))
-	return out
+	return CameraReport(
+		status=status,
+		caught=crowded[READY],
+		candidate=crowded[CANDIDATE],
+		missed=sum(crowded[s] for s in MISSED),
+		catch=weighted_catch(dict(crowded), weights, (READY,)),
+		catch_ci=catch_interval(rows, weights, (READY,)),
+		catch_with_candidate=weighted_catch(dict(crowded), weights, (READY, CANDIDATE)),
+	)
 
 
 def print_report(title: str, rows: list[dict], weights: dict[tuple[str, str], float]) -> None:
@@ -99,44 +130,39 @@ def print_report(title: str, rows: list[dict], weights: dict[tuple[str, str], fl
 		report = camera_report(judged, w)
 		extra = Counter(r["label"] for r in part if r["label"] not in ("crowded", "not_crowded"))
 		print(f"{camera}: {len(judged)} judged crops (also: {dict(extra) or 'none'})")
-		for status, (k, n, lo, hi) in report["status"].items():
+		for status, (k, n, lo, hi) in report.status.items():
 			if n:
 				print(f"  CV {status:9} {n:3} crops, human says crowded {k:3} = {k / n:5.1%} [{lo:.0%}-{hi:.0%}]")
-		lo, hi = report["catch_ci"]
+		lo, hi = report.catch_ci
 		print(
-			f"  crowded plants: caught (CV ready) {report['caught']}, candidate {report['candidate']}, "
-			f"missed (growing/empty) {report['missed']}; catch rate weighted to the population "
-			f"{report['catch']:.1%} [{lo:.0%}-{hi:.0%}] (with candidate {report['catch_with_candidate']:.1%})"
+			f"  crowded plants: caught (CV ready) {report.caught}, candidate {report.candidate}, "
+			f"missed (growing/empty) {report.missed}; catch rate weighted to the population "
+			f"{report.catch:.1%} [{lo:.0%}-{hi:.0%}] (with candidate {report.catch_with_candidate:.1%})"
 		)
 
 
-def main() -> None:
-	parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-	parser.add_argument("--dir", type=Path, default=Path("labels/readiness"))
-	parser.add_argument("--runs", type=Path, default=Path("data/runs"))
-	parser.add_argument("--out", type=Path, default=Path("data/checks/readiness_eval_items.csv"))
-	args = parser.parse_args()
-
-	with open(args.dir / "items.csv", encoding="utf-8") as handle:
-		items = {row["item_id"]: row for row in csv.DictReader(handle)}
-	with open(args.dir / "labels.csv", encoding="utf-8") as handle:
-		labels = list(csv.DictReader(handle))
-	if not labels:
-		raise SystemExit(f"No labels yet in {args.dir / 'labels.csv'}: run tools/label_holes.py first")
-	unknown = [row["item_id"] for row in labels if row["item_id"] not in items]
-	if unknown:  # answers to another crop set (e.g. the 7 Oct question) must never be scored against this one
-		raise SystemExit(f"{len(unknown)} labels are for items not in items.csv (another crop set?), e.g. {unknown[0]}")
+def read_weights(strata_csv: Path) -> dict[tuple[str, str], float]:
+	"""Per (camera, status): hole-days available / crops picked, to weight crops back to the population."""
 	weights = {}
-	with open(args.dir / "strata.csv", encoding="utf-8") as handle:
+	with open(strata_csv, encoding="utf-8") as handle:
 		for row in csv.DictReader(handle):
 			if int(row["picked"]):
 				weights[(row["camera_id"], row["status"])] = int(row["hole_days_available"]) / int(row["picked"])
-	observations = {}
-	for path in args.runs.glob("*/observations.csv"):
-		with open(path, encoding="utf-8") as handle:
-			for row in csv.DictReader(handle):
-				observations[(row["camera_id"], row["period"], row["image_id"], row["hole_id"])] = row
+	return weights
 
+
+def labelled_rows(labels_dir: Path, runs_dir: Path) -> list[dict]:
+	"""Every label joined with its crop and the CV's numbers for that hole and frame."""
+	with open(labels_dir / "items.csv", encoding="utf-8") as handle:
+		items = {row["item_id"]: row for row in csv.DictReader(handle)}
+	with open(labels_dir / "labels.csv", encoding="utf-8") as handle:
+		labels = list(csv.DictReader(handle))
+	if not labels:
+		raise SystemExit(f"No labels yet in {labels_dir / 'labels.csv'}: run tools/label_holes.py first")
+	unknown = [row["item_id"] for row in labels if row["item_id"] not in items]
+	if unknown:  # answers to another crop set (e.g. the 7 Oct question) must never be scored against this one
+		raise SystemExit(f"{len(unknown)} labels are for items not in items.csv (another crop set?), e.g. {unknown[0]}")
+	observations = {(r["camera_id"], r["period"], r["image_id"], r["hole_id"]): r for r in read_observations(runs_dir)}
 	rows = []
 	for label in labels:
 		item = items[label["item_id"]]
@@ -152,12 +178,11 @@ def main() -> None:
 				"status": obs["status"],
 			}
 		)
-	print(f"{len(rows)} labels: " + ", ".join(f"{k} {v}" for k, v in Counter(r["label"] for r in rows).most_common()))
-	print("Rules frozen (metrics-v3, rule-v5): these numbers are reported as they are, nothing is tuned on them.")
+	return rows
 
-	print_report("All labelled crops (the main result)", rows, weights)
-	print_report("Test days only (for reference)", [r for r in rows if r["split"] == "test"], weights)
 
+def print_empty(rows: list[dict]) -> None:
+	"""How often a human answered "empty" for CV-empty crops, and the reverse."""
 	print("\n=== Empty ===")
 	for camera in sorted({r["camera_id"] for r in rows}):
 		part = [r for r in rows if r["camera_id"] == camera]
@@ -170,6 +195,9 @@ def main() -> None:
 			f"human 'empty' {len(said_empty)}, of which CV empty {cv_empty_of_human}"
 		)
 
+
+def print_threshold_finding(rows: list[dict]) -> None:
+	"""Finding only, never applied: agreement with the labels at other raw contact thresholds (dev days)."""
 	dev = [r for r in rows if r["split"] == "dev" and r["label"] in ("crowded", "not_crowded")]
 	if dev:
 		truth = np.array([r["label"] == "crowded" for r in dev])
@@ -178,6 +206,22 @@ def main() -> None:
 		for threshold in THRESHOLDS:
 			print(f"  {threshold:.2f}  {np.mean((contact >= threshold) == truth):.1%}")
 
+
+def main() -> None:
+	parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+	parser.add_argument("--dir", type=Path, default=Path("labels/readiness"))
+	parser.add_argument("--runs", type=Path, default=Path("data/runs"))
+	parser.add_argument("--out", type=Path, default=Path("data/checks/readiness_eval_items.csv"))
+	args = parser.parse_args()
+
+	rows = labelled_rows(args.dir, args.runs)
+	weights = read_weights(args.dir / "strata.csv")
+	print(f"{len(rows)} labels: " + ", ".join(f"{k} {v}" for k, v in Counter(r["label"] for r in rows).most_common()))
+	print("Rules frozen (metrics-v3, rule-v5): these numbers are reported as they are, nothing is tuned on them.")
+	print_report("All labelled crops (the main result)", rows, weights)
+	print_report("Test days only (for reference)", [r for r in rows if r["split"] == "test"], weights)
+	print_empty(rows)
+	print_threshold_finding(rows)
 	args.out.parent.mkdir(parents=True, exist_ok=True)
 	write_csv(args.out, list(rows[0]), rows)
 	print(f"\nWrote {args.out}")

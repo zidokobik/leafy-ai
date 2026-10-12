@@ -118,6 +118,6 @@ def test_report_counts_caught_candidate_and_missed(evaluate):
 		+ [{"status": "growing", "label": "not_crowded"}] * 5
 	)
 	report = evaluate.camera_report(rows, {s: 1.0 for s in evaluate.STATUSES})
-	assert (report["caught"], report["candidate"], report["missed"]) == (4, 2, 3)
-	assert report["status"]["growing"][:2] == (3, 8)
-	assert report["catch"] == pytest.approx(4 / 9)
+	assert (report.caught, report.candidate, report.missed) == (4, 2, 3)
+	assert report.status["growing"][:2] == (3, 8)
+	assert report.catch == pytest.approx(4 / 9)

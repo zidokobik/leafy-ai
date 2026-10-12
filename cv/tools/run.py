@@ -41,7 +41,7 @@ import leafy_cv.hole_map as hole_map_module
 import leafy_cv.metrics as metrics_module
 from leafy_cv.csv_files import format_optional, write_csv
 from leafy_cv.drawing import FONT, draw_plant_outline, put_outlined_text
-from leafy_cv.frame_index import map_frames, read_frame_index
+from leafy_cv.frame_index import IndexRow, map_frames, read_frame_index
 from leafy_cv.frames import parse_frame_path, read_image
 from leafy_cv.hole_map import ACROSS, ALONG, Cells, HoleMap, build_cells, camera_number, zone_mask
 from leafy_cv.metrics import FrameMeasure, hole_contact, measure_frame, pair_contact
@@ -97,7 +97,7 @@ GAP_FIELDS = [
 	"contact",
 ]
 
-# One frame's rows of the index / measurements / observations, as read from or written to the CSV files.
+# A row of measurements.csv / observations.csv, keyed by its column names (the CSV files are the contract).
 Row = dict
 # Per pair of plants (i, j): (closed lines, lines), see metrics.pair_contact.
 PairContacts = dict[tuple[int, int], tuple[int, int]]
@@ -179,7 +179,7 @@ def layout_problems(index_csv: Path, frames_root: Path, hole_map: HoleMap, maps_
 	"""
 	rows = read_frame_index(index_csv, hole_map.camera_id)
 	problems: list[str] = []
-	last = rows[-1]["captured_at"] if rows else ""
+	last = rows[-1].captured_at if rows else ""
 	folder = frames_root / hole_map.camera_id
 	newer = sorted(
 		frame.captured_at.isoformat()
@@ -193,18 +193,18 @@ def layout_problems(index_csv: Path, frames_root: Path, hole_map: HoleMap, maps_
 			f"index (last {last or 'none'}). Rebuild it first (tools/build_frame_index.py) so tray changes among "
 			f"them are found. Not run."
 		)
-	periods: dict[str, list[Row]] = defaultdict(list)
+	periods: dict[str, list[IndexRow]] = defaultdict(list)
 	for row in rows:
-		periods[row["period"]].append(row)
+		periods[row.period].append(row)
 	mine = periods.get(hole_map.period, [])
-	end = mine[-1]["captured_at"] if mine else hole_map.valid_from
+	end = mine[-1].captured_at if mine else hole_map.valid_from
 	for period, members in periods.items():
 		start = members[0]
-		if period == hole_map.period or start["captured_at"] <= end:
+		if period == hole_map.period or start.captured_at <= end:
 			continue
 		if not (maps_dir / f"{hole_map.camera_id}_{period}.json").exists():
 			problems.append(
-				f"{hole_map.camera_id}: layout changed at {start['captured_at']} ({start['status']}, period {period}, "
+				f"{hole_map.camera_id}: layout changed at {start.captured_at} ({start.status}, period {period}, "
 				f"{len(members)} frames) and there is no hole map {hole_map.camera_id}_{period}.json. Those frames are "
 				f"not measured; click a map (tools/click_holes.py) before trusting the newest statuses."
 			)
@@ -214,25 +214,25 @@ def layout_problems(index_csv: Path, frames_root: Path, hole_map: HoleMap, maps_
 # --- step 2: which frames
 
 
-def pick_frames(index_csv: Path, hole_map: HoleMap) -> list[Row]:
+def pick_frames(index_csv: Path, hole_map: HoleMap) -> list[IndexRow]:
 	"""Usable frames in the map's dates and period, oldest first."""
 	mine, other = map_frames(index_csv, hole_map)
 	if other:
-		files = [row["file"] for row in other]
+		files = [row.file for row in other]
 		print(f"  WARNING: {len(files)} frames in the map's dates belong to another period, skipped: {files[:3]}")
 	return mine
 
 
-def select_frames(args: argparse.Namespace, run: MapRun) -> list[Row]:
+def select_frames(args: argparse.Namespace, run: MapRun) -> list[IndexRow]:
 	"""The map's frames, cut to --limit, without frames missing from --frames-root (reported)."""
 	frames = pick_frames(args.index_csv, run.hole_map)
 	if args.limit:
 		frames = frames[: args.limit]
 	folder = args.frames_root / run.hole_map.camera_id
-	missing = [f["file"] for f in frames if not (folder / f["file"]).exists()]
+	missing = [f.file for f in frames if not (folder / f.file).exists()]
 	if missing:
 		print(f"  WARNING: {len(missing)} frames not found under {args.frames_root}, skipped: {missing[:3]}")
-		frames = [f for f in frames if f["file"] not in missing]
+		frames = [f for f in frames if f.file not in missing]
 	return frames
 
 
@@ -281,11 +281,11 @@ def load_plant_pixels(path: Path, made_with: str, width: int) -> np.ndarray:
 		return unpack_masks(data["plant"][None], width)[0]
 
 
-def measurement_rows(run: MapRun, frame: Row, measure: FrameMeasure) -> list[Row]:
+def measurement_rows(run: MapRun, frame: IndexRow, measure: FrameMeasure) -> list[Row]:
 	"""One measurements.csv row per hole and per zone of a measured frame."""
 	common = {
-		"file": frame["file"],
-		"captured_at": frame["captured_at"],
+		"file": frame.file,
+		"captured_at": frame.captured_at,
 		"measured_with": run.measured_with,
 		"map_hash": run.map_hash,
 		"runtime_ms": measure.runtime_ms,
@@ -319,7 +319,7 @@ def measurement_rows(run: MapRun, frame: Row, measure: FrameMeasure) -> list[Row
 def measure_missing(
 	args: argparse.Namespace,
 	run: MapRun,
-	frames: list[Row],
+	frames: list[IndexRow],
 	plant_filter: PlantFilter,
 	get_segmenter: Callable[[], "Segmenter"],
 ) -> dict[str, list[Row]]:
@@ -331,18 +331,18 @@ def measure_missing(
 	todo = [
 		f
 		for f in frames
-		if f["file"] not in cache or plant_pixels_made_with(run.pixels_path(f["file"])) != run.pixels_made_with
+		if f.file not in cache or plant_pixels_made_with(run.pixels_path(f.file)) != run.pixels_made_with
 	]
 	print(
 		f"{run.name}: {len(frames)} usable frames, {len(frames) - len(todo)} already measured, {len(todo)} to measure"
 	)
 	for n, frame in enumerate(todo, start=1):
 		segmenter = get_segmenter()
-		image = read_image(args.frames_root / run.hole_map.camera_id / frame["file"])
+		image = read_image(args.frames_root / run.hole_map.camera_id / frame.file)
 		measure = measure_frame(image, run.hole_map, run.cells, segmenter, plant_filter)
-		cache[frame["file"]] = measurement_rows(run, frame, measure)
-		save_plant_pixels(run.pixels_path(frame["file"]), measure.plant_mask, run.pixels_made_with)
-		print(f"  [{n}/{len(todo)}] {frame['file']}  {measure.runtime_ms / 1000:.1f} s", flush=True)
+		cache[frame.file] = measurement_rows(run, frame, measure)
+		save_plant_pixels(run.pixels_path(frame.file), measure.plant_mask, run.pixels_made_with)
+		print(f"  [{n}/{len(todo)}] {frame.file}  {measure.runtime_ms / 1000:.1f} s", flush=True)
 		# write the cache as we go, so an interrupted run keeps what it measured
 		if n % 10 == 0 or n == len(todo):
 			write_csv(cache_path, MEASUREMENT_FIELDS, cache_rows(cache), extrasaction="ignore")
@@ -353,29 +353,27 @@ def measure_missing(
 # --- step 4: contact per pair of plants, from the saved plant pixels (no MobileSAM)
 
 
-def gap_contacts(run: MapRun, frames: list[Row]) -> dict[str, PairContacts]:
+def gap_contacts(run: MapRun, frames: list[IndexRow]) -> dict[str, PairContacts]:
 	"""Per frame file: closed lines / lines for every pair of plants."""
 	width = run.hole_map.image_size[0]
 	return {
-		frame["file"]: pair_contact(
-			load_plant_pixels(run.pixels_path(frame["file"]), run.pixels_made_with, width), run.cells
-		)
+		frame.file: pair_contact(load_plant_pixels(run.pixels_path(frame.file), run.pixels_made_with, width), run.cells)
 		for frame in frames
 	}
 
 
-def write_gaps(path: Path, run: MapRun, frames: list[Row], gap_contact: dict[str, PairContacts]) -> None:
+def write_gaps(path: Path, run: MapRun, frames: list[IndexRow], gap_contact: dict[str, PairContacts]) -> None:
 	"""One row per frame x pair of plants (direction "along" = same channel, "across" = next channel): closed
 	lines out of all lines."""
 	holes = run.hole_map.holes
 	rows = []
 	for frame in frames:
-		for (i, j), (closed, lines) in gap_contact[frame["file"]].items():
+		for (i, j), (closed, lines) in gap_contact[frame.file].items():
 			a, b = holes[i], holes[j]
 			rows.append(
 				{
-					"image_id": frame["file"],
-					"captured_at": frame["captured_at"],
+					"image_id": frame.file,
+					"captured_at": frame.captured_at,
 					"direction": run.cells.pair_direction[(i, j)],
 					"channels": "-".join(str(c) for c in sorted((run.hole_map.channel(a), run.hole_map.channel(b)))),
 					"hole_a": a.hole_id,
@@ -459,12 +457,12 @@ def zone_observations(run: MapRun, rows: list[Row]) -> list[dict]:
 
 
 def build_observations(
-	run: MapRun, frames: list[Row], cache: dict[str, list[Row]], gap_contact: dict[str, PairContacts]
+	run: MapRun, frames: list[IndexRow], cache: dict[str, list[Row]], gap_contact: dict[str, PairContacts]
 ) -> list[dict]:
 	"""Statuses over the whole sequence of usable frames, per hole and per zone; rows sorted by time."""
 	by_id: dict[str, list[Row]] = defaultdict(list)
 	for frame in frames:
-		for row in cache[frame["file"]]:
+		for row in cache[frame.file]:
 			by_id[row["id"]].append(row)
 	index_of = {h.hole_id: i for i, h in enumerate(run.hole_map.holes)}
 	observations = []
@@ -550,7 +548,7 @@ def draw_frame(image: np.ndarray, run: MapRun, plant_mask: np.ndarray, rows: lis
 def write_overlays(
 	args: argparse.Namespace,
 	run: MapRun,
-	frames: list[Row],
+	frames: list[IndexRow],
 	observations: list[dict],
 	gap_contact: dict[str, PairContacts],
 ) -> None:
@@ -560,13 +558,15 @@ def write_overlays(
 		by_file[row["image_id"]].append(row)
 	picks = frames if args.overlays == "all" else daily_picks(frames)
 	for frame in picks:
-		image = read_image(args.frames_root / run.hole_map.camera_id / frame["file"])
-		plant_mask = load_plant_pixels(run.pixels_path(frame["file"]), run.pixels_made_with, image.shape[1])
-		overlay = draw_frame(image, run, plant_mask, by_file[frame["file"]], gap_contact[frame["file"]])
-		cv2.imwrite(str(run.out_dir / "overlays" / f"{Path(frame['file']).stem}.jpg"), overlay)
+		image = read_image(args.frames_root / run.hole_map.camera_id / frame.file)
+		plant_mask = load_plant_pixels(run.pixels_path(frame.file), run.pixels_made_with, image.shape[1])
+		overlay = draw_frame(image, run, plant_mask, by_file[frame.file], gap_contact[frame.file])
+		cv2.imwrite(str(run.out_dir / "overlays" / f"{Path(frame.file).stem}.jpg"), overlay)
 
 
-def draw_timeline(ids: list[str], frames: list[Row], status_of: dict[tuple[str, str], str], title: str) -> np.ndarray:
+def draw_timeline(
+	ids: list[str], frames: list[IndexRow], status_of: dict[tuple[str, str], str], title: str
+) -> np.ndarray:
 	"""One row per hole/zone, one column per frame, coloured by status; a white line at each new day."""
 	cell_w, cell_h, left, top = 6, 12, 130, 40
 	image = np.full((top + cell_h * len(ids) + 30, left + cell_w * len(frames) + 10, 3), 255, np.uint8)
@@ -575,11 +575,11 @@ def draw_timeline(ids: list[str], frames: list[Row], status_of: dict[tuple[str, 
 		y = top + r * cell_h
 		cv2.putText(image, ident, (4, y + cell_h - 2), FONT, 0.33, (0, 0, 0), 1)
 		for c, frame in enumerate(frames):
-			colour = STATUS_COLOURS[status_of[(frame["file"], ident)]]
+			colour = STATUS_COLOURS[status_of[(frame.file, ident)]]
 			cv2.rectangle(image, (left + c * cell_w, y), (left + (c + 1) * cell_w - 1, y + cell_h - 2), colour, -1)
 	previous = None
 	for c, frame in enumerate(frames):
-		day = frame["captured_at"][:10]
+		day = frame.captured_at[:10]
 		if day != previous:
 			x = left + c * cell_w
 			cv2.line(image, (x - 1, top - 4), (x - 1, top + cell_h * len(ids)), (255, 255, 255), 2)
@@ -588,7 +588,7 @@ def draw_timeline(ids: list[str], frames: list[Row], status_of: dict[tuple[str, 
 	return image
 
 
-def write_timeline(run: MapRun, frames: list[Row], observations: list[dict]) -> None:
+def write_timeline(run: MapRun, frames: list[IndexRow], observations: list[dict]) -> None:
 	hole_map = run.hole_map
 	ids = [h.hole_id for h in hole_map.holes] + [zone_id(hole_map, z.name) for z in hole_map.zones]
 	status_of = {(r["image_id"], r["hole_id"]): r["status"] for r in observations}
@@ -596,20 +596,20 @@ def write_timeline(run: MapRun, frames: list[Row], observations: list[dict]) -> 
 	cv2.imwrite(str(run.out_dir / "timeline.png"), timeline)
 
 
-def daily_picks(frames: list[Row]) -> list[Row]:
+def daily_picks(frames: list[IndexRow]) -> list[IndexRow]:
 	"""The frame nearest midday of each day, plus the first and last frames."""
-	by_day: dict[str, list[Row]] = defaultdict(list)
+	by_day: dict[str, list[IndexRow]] = defaultdict(list)
 	for frame in frames:
-		by_day[frame["captured_at"][:10]].append(frame)
-	picks = {frames[0]["file"]: frames[0], frames[-1]["file"]: frames[-1]}
+		by_day[frame.captured_at[:10]].append(frame)
+	picks = {frames[0].file: frames[0], frames[-1].file: frames[-1]}
 	for day_frames in by_day.values():
-		best = min(day_frames, key=lambda f: abs(datetime.fromisoformat(f["captured_at"]).hour - 12))
-		picks[best["file"]] = best
-	return sorted(picks.values(), key=lambda f: f["captured_at"])
+		best = min(day_frames, key=lambda f: abs(datetime.fromisoformat(f.captured_at).hour - 12))
+		picks[best.file] = best
+	return sorted(picks.values(), key=lambda f: f.captured_at)
 
 
-def summarise(name: str, frames: list[Row], observations: list[dict], cache: dict[str, list[Row]]) -> None:
-	last = frames[-1]["file"]
+def summarise(name: str, frames: list[IndexRow], observations: list[dict], cache: dict[str, list[Row]]) -> None:
+	last = frames[-1].file
 	counts = Counter(r["status"] for r in observations if r["image_id"] == last and r["kind"] == "hole")
 	print(f"  last frame {last}: " + ", ".join(f"{k} {v}" for k, v in counts.most_common()))
 	for row in observations:
@@ -622,7 +622,7 @@ def summarise(name: str, frames: list[Row], observations: list[dict], cache: dic
 		if row["status"] == READY and row["hole_id"] not in first_ready:
 			first_ready[row["hole_id"]] = row["captured_at"]
 	days = (
-		datetime.fromisoformat(frames[-1]["captured_at"]) - datetime.fromisoformat(frames[0]["captured_at"])
+		datetime.fromisoformat(frames[-1].captured_at) - datetime.fromisoformat(frames[0].captured_at)
 	).total_seconds() / 86400
 	judged = [h for h, s in statuses.items() if UNCERTAIN not in s]
 	rates = [flip_rate(statuses[h], days) for h in judged]

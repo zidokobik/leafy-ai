@@ -12,6 +12,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+# Overlays burnt into every frame: a timestamp strip along the top and a watermark in the bottom-right corner.
+TIMESTAMP_STRIP_PX = 40
+WATERMARK_PX = (160, 40)  # width, height
 FILENAME_PATTERN = re.compile(r"^(?P<camera>level\d+_camera\d+)_(?P<date>\d{8})_(?P<time>\d{6})\.jpg$")
 
 

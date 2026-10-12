@@ -130,14 +130,14 @@ def test_map_frames_keeps_the_maps_own_period(tmp_path):
 		("g1", "2026-10-01T12:00:00", "P2", "True"),  # another camera
 		("f0", "2026-09-30T10:00:00", "P2", "True"),  # before the map's dates
 	]
-	lines = ["camera_id,file,captured_at,period,usable"]
+	lines = ["camera_id,file,captured_at,period,status,usable"]
 	for file, at, period, usable in rows:
 		camera = "level1_camera3" if file.startswith("g") else "level1_camera2"
-		lines.append(f"{camera},{file}.jpg,{at},{period},{usable}")
+		lines.append(f"{camera},{file}.jpg,{at},{period},ok,{usable}")
 	(tmp_path / "index.csv").write_text("\n".join(lines) + "\n")
 	hole_map = HoleMap(
 		"level1_camera2", 1, "P2", "2026-10-01T00:00:00", None, (10, 10), "f1.jpg", [Hole("L1-C2-R01-H01", 1, 1, 1, 1)]
 	)
 	mine, other = map_frames(tmp_path / "index.csv", hole_map)
-	assert [r["file"] for r in mine] == ["f1.jpg", "f3.jpg"]  # usable, own period, in the dates, oldest first
-	assert [r["file"] for r in other] == ["f4.jpg"]
+	assert [r.file for r in mine] == ["f1.jpg", "f3.jpg"]  # usable, own period, in the dates, oldest first
+	assert [r.file for r in other] == ["f4.jpg"]

@@ -29,7 +29,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
-from leafy_cv.csv_files import write_csv
+from leafy_cv.csv_files import read_observations, write_csv
 from leafy_cv.readiness import CANDIDATE, EMPTY, GROWING, READY
 
 QUOTAS = {READY: 32, GROWING: 32, CANDIDATE: 12, EMPTY: 6}
@@ -43,20 +43,25 @@ def hole_day(row: dict) -> tuple[str, str, str]:
 	return row["camera_id"], row["hole_id"], row["captured_at"][:10]
 
 
+def is_early(row: dict) -> bool:
+	"""Camera 2 in the first two days after the 30 Sep transfer (the days that decide whether `ready` was real)."""
+	return (
+		row["camera_id"] == EARLY_CAMERA and row["captured_at"] >= EARLY_FROM and row["captured_at"][:10] in EARLY_DAYS
+	)
+
+
+def can_label(row: dict, training_frames: set[str]) -> bool:
+	"""A hole row inside the frame, with a status we report and a contact (unless empty), not a training frame."""
+	if row["kind"] != "hole" or row["status"] not in QUOTAS or "edge_of_frame" in row["flags"]:
+		return False
+	if row["image_id"] in training_frames:
+		return False
+	return row["status"] == EMPTY or row["boundary_contact"] != ""
+
+
 def read_pool(runs: Path, training_frames: set[str]) -> list[dict]:
-	"""Hole rows that can be labelled: inside the frame, with a status we report, not a training frame."""
-	pool = []
-	for path in sorted(runs.glob("*/observations.csv")):
-		with open(path, encoding="utf-8") as handle:
-			for row in csv.DictReader(handle):
-				if row["kind"] != "hole" or row["status"] not in QUOTAS or "edge_of_frame" in row["flags"]:
-					continue
-				if row["image_id"] in training_frames:
-					continue
-				if row["status"] != EMPTY and row["boundary_contact"] == "":
-					continue
-				pool.append(row)
-	return pool
+	"""Hole rows that can be labelled."""
+	return [row for row in read_observations(runs) if can_label(row, training_frames)]
 
 
 def spread_key(row: dict) -> str:
@@ -98,14 +103,7 @@ def pick_items(pool: list[dict], rng: random.Random) -> tuple[list[dict], dict]:
 		count[key] += 1
 		return True
 
-	early = [
-		r
-		for r in rows
-		if r["camera_id"] == EARLY_CAMERA
-		and r["captured_at"] >= EARLY_FROM
-		and r["captured_at"][:10] in EARLY_DAYS
-		and r["status"] in (READY, GROWING)
-	]
+	early = [r for r in rows if is_early(r) and r["status"] in (READY, GROWING)]
 	n_early = defaultdict(int)
 	for row in round_robin(early, lambda r: r["row"]):  # spread over the board's rows
 		if n_early[row["status"]] < EARLY_QUOTAS[row["status"]] and take(row):
@@ -117,6 +115,33 @@ def pick_items(pool: list[dict], rng: random.Random) -> tuple[list[dict], dict]:
 				break
 			take(row)
 	return picked, {k: (available[k], count[k]) for k in sorted(available)}
+
+
+def item_id(row: dict) -> str:
+	"""camera_period_YYYYMMDD_HHMMSS_holeid (the time comes from the frame file name)."""
+	stamp = row["image_id"][-19:-4]  # <camera>_YYYYMMDD_HHMMSS.jpg -> YYYYMMDD_HHMMSS
+	return f"{row['camera_id']}_{row['period']}_{stamp}_{row['hole_id']}"
+
+
+def make_items(picked: list[dict], rng: random.Random) -> list[dict]:
+	"""items.csv rows in a shuffled labelling order, each with a dev/test split by day (alternating days)."""
+	days = sorted({row["captured_at"][:10] for row in picked})
+	split_of = {day: ("dev" if i % 2 == 0 else "test") for i, day in enumerate(days)}
+	ordered = picked[:]
+	rng.shuffle(ordered)
+	return [
+		{
+			"item_id": item_id(row),
+			"camera_id": row["camera_id"],
+			"period": row["period"],
+			"file": row["image_id"],
+			"captured_at": row["captured_at"],
+			"hole_id": row["hole_id"],
+			"split": split_of[row["captured_at"][:10]],
+			"order": n,
+		}
+		for n, row in enumerate(ordered)
+	]
 
 
 def main() -> None:
@@ -137,22 +162,7 @@ def main() -> None:
 
 	rng = random.Random(args.seed)
 	picked, strata = pick_items(pool, rng)
-	days = sorted({row["captured_at"][:10] for row in picked})
-	split_of = {day: ("dev" if i % 2 == 0 else "test") for i, day in enumerate(days)}
-	rng.shuffle(picked)
-	items = [
-		{
-			"item_id": f"{row['camera_id']}_{row['period']}_{row['image_id'][-19:-4]}_{row['hole_id']}",
-			"camera_id": row["camera_id"],
-			"period": row["period"],
-			"file": row["image_id"],
-			"captured_at": row["captured_at"],
-			"hole_id": row["hole_id"],
-			"split": split_of[row["captured_at"][:10]],
-			"order": n,
-		}
-		for n, row in enumerate(picked)
-	]
+	items = make_items(picked, rng)
 	args.out.parent.mkdir(parents=True, exist_ok=True)
 	write_csv(args.out, list(items[0]), items)
 	strata_rows = [
@@ -163,11 +173,7 @@ def main() -> None:
 	print(f"Wrote {len(items)} items to {args.out} (strata in {args.out.parent / 'strata.csv'}):")
 	for (camera, status), (available, n) in strata.items():
 		print(f"  {camera} {status}: {n} of {available} hole-days")
-	early = sum(
-		i["camera_id"] == EARLY_CAMERA and i["captured_at"] >= EARLY_FROM and i["captured_at"][:10] in EARLY_DAYS
-		for i in items
-	)
-	print(f"  {EARLY_CAMERA} on {', '.join(EARLY_DAYS)}: {early}")
+	print(f"  {EARLY_CAMERA} on {', '.join(EARLY_DAYS)}: {sum(is_early(i) for i in items)}")
 	print("Next: uv run python tools/label_holes.py --frames-root <frames folder>")
 
 

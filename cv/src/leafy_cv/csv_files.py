@@ -1,7 +1,7 @@
 """Writing the CSV outputs: one way for every tool (each used to write its own, not all of them safely)."""
 
 import csv
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 
@@ -19,3 +19,10 @@ def write_csv(path: Path, fields: Sequence[str], rows: Sequence[dict], extrasact
 def format_optional(value: float | None, spec: str = "") -> str:
 	"""A value for a CSV cell: "" when missing, else formatted with `spec` (e.g. ".4f")."""
 	return "" if value is None else format(value, spec)
+
+
+def read_observations(runs_dir: Path) -> Iterator[dict[str, str]]:
+	"""Every row of every map's observations.csv under runs_dir (data/runs/<camera>_<period>/), map by map."""
+	for path in sorted(runs_dir.glob("*/observations.csv")):
+		with open(path, encoding="utf-8") as handle:
+			yield from csv.DictReader(handle)

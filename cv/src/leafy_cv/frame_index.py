@@ -117,14 +117,32 @@ def label_sequence(
 	return labels
 
 
-def read_frame_index(index_csv: Path, camera_id: str) -> list[dict[str, str]]:
+@dataclass(frozen=True)
+class IndexRow:
+	"""One frame of data/frame_index.csv (the columns the pipeline reads)."""
+
+	camera_id: str
+	file: str
+	captured_at: str  # ISO 8601 as written by build_frame_index.py; one format, so text order is time order
+	period: str
+	status: str
+	usable: bool
+
+	@classmethod
+	def from_csv(cls, row: dict[str, str]) -> "IndexRow":
+		return cls(
+			row["camera_id"], row["file"], row["captured_at"], row["period"], row["status"], row["usable"] == "True"
+		)
+
+
+def read_frame_index(index_csv: Path, camera_id: str) -> list[IndexRow]:
 	"""One camera's rows of the frame index (data/frame_index.csv), oldest first."""
 	with open(index_csv, encoding="utf-8") as handle:
-		rows = [row for row in csv.DictReader(handle) if row["camera_id"] == camera_id]
-	return sorted(rows, key=lambda row: row["captured_at"])
+		rows = [IndexRow.from_csv(row) for row in csv.DictReader(handle) if row["camera_id"] == camera_id]
+	return sorted(rows, key=lambda row: row.captured_at)
 
 
-def map_frames(index_csv: Path, hole_map: HoleMap) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+def map_frames(index_csv: Path, hole_map: HoleMap) -> tuple[list[IndexRow], list[IndexRow]]:
 	"""Usable frames in the map's dates, oldest first: (those in the map's period, those in another period).
 
 	Frames of another period inside the dates are never measured with this map (a layout change the map's dates
@@ -132,9 +150,9 @@ def map_frames(index_csv: Path, hole_map: HoleMap) -> tuple[list[dict[str, str]]
 	in_dates = [
 		row
 		for row in read_frame_index(index_csv, hole_map.camera_id)
-		if row["usable"] == "True"
-		and row["captured_at"] >= hole_map.valid_from
-		and (hole_map.valid_to is None or row["captured_at"] <= hole_map.valid_to)
+		if row.usable
+		and row.captured_at >= hole_map.valid_from
+		and (hole_map.valid_to is None or row.captured_at <= hole_map.valid_to)
 	]
-	mine = [row for row in in_dates if row["period"] == hole_map.period]
-	return mine, [row for row in in_dates if row["period"] != hole_map.period]
+	mine = [row for row in in_dates if row.period == hole_map.period]
+	return mine, [row for row in in_dates if row.period != hole_map.period]

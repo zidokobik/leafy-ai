@@ -22,7 +22,7 @@ import cv2
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GroupKFold, cross_val_predict
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from leafy_cv.drawing import put_outlined_text
@@ -39,11 +39,11 @@ ERROR_TILES = 24
 C = 10.0
 
 
-def model():
+def model() -> Pipeline:
 	return make_pipeline(StandardScaler(), LogisticRegression(C=C, class_weight="balanced", max_iter=5000))
 
 
-def error_sheet(rows: list[dict], images: dict, masks: dict, out: Path) -> None:
+def error_sheet(rows: list[dict], images: dict[str, np.ndarray], masks: dict[str, np.ndarray], out: Path) -> None:
 	tiles = []
 	for row in rows[:ERROR_TILES]:
 		image = images[row["file"]]
@@ -67,17 +67,11 @@ def error_sheet(rows: list[dict], images: dict, masks: dict, out: Path) -> None:
 	cv2.imwrite(str(out), sheet)
 
 
-def main() -> None:
-	parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-	parser.add_argument("--frames-root", type=Path, required=True)
-	parser.add_argument("--dir", type=Path, default=Path("labels/plant_masks"))
-	parser.add_argument("--out", type=Path, default=Path("trained/plant_filter.json"))
-	parser.add_argument("--errors", type=Path, default=Path("data/checks/plant_filter_errors.jpg"))
-	args = parser.parse_args()
-
-	with open(args.dir / "candidates.csv", encoding="utf-8") as handle:
+def read_answers(labels_dir: Path) -> tuple[dict[str, dict], list[dict]]:
+	"""The candidates by id, and the plant / not plant answers (mixed and skip are counted, not used)."""
+	with open(labels_dir / "candidates.csv", encoding="utf-8") as handle:
 		candidates = {row["candidate_id"]: row for row in csv.DictReader(handle)}
-	with open(args.dir / "labels.csv", encoding="utf-8") as handle:
+	with open(labels_dir / "labels.csv", encoding="utf-8") as handle:
 		answers = list(csv.DictReader(handle))
 	counts = Counter(a["label"] for a in answers)
 	print(f"{len(answers)} answers: " + ", ".join(f"{k} {v}" for k, v in counts.most_common()))
@@ -86,13 +80,19 @@ def main() -> None:
 		raise SystemExit(f"Need at least {MIN_LABELS} plant / not plant answers; have {len(used)}.")
 	if counts["mixed"] / max(len(answers), 1) > 0.15:
 		print("  Note: over 15% mixed. MobileSAM often outlines plant and board together; check the prompts.")
+	return candidates, used
 
+
+def load_examples(
+	used: list[dict], candidates: dict[str, dict], frames_root: Path, masks_path: Path
+) -> tuple[list[dict], dict[str, np.ndarray], dict[str, np.ndarray], np.ndarray]:
+	"""Per answer: its candidate row (+ label) and features; also the frames and outlines (for the error sheet)."""
 	images, masks, rows, features = {}, {}, [], []
-	with np.load(args.dir / "masks.npz") as packed:
+	with np.load(masks_path) as packed:
 		for answer in used:
 			row = {**candidates[answer["candidate_id"]], "label": answer["label"]}
 			if row["file"] not in images:
-				image = cv2.imread(str(args.frames_root / row["camera_id"] / row["file"]))
+				image = cv2.imread(str(frames_root / row["camera_id"] / row["file"]))
 				if image is None:
 					raise SystemExit(f"Could not read {row['file']}; check --frames-root")
 				images[row["file"]] = image
@@ -100,10 +100,12 @@ def main() -> None:
 			masks[row["candidate_id"]] = mask
 			features.append(mask_features(images[row["file"]], mask))
 			rows.append(row)
-	x = np.array(features)
-	y = np.array([row["label"] == "plant" for row in rows])
-	groups = np.array([row["file"] for row in rows])
+	return rows, images, masks, np.array(features)
 
+
+def cross_validate(rows: list[dict], x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, float]:
+	"""P(plant) of every example from a model that never saw its frame, and the accuracy; prints the report."""
+	groups = np.array([row["file"] for row in rows])
 	folds = min(FOLDS, len(set(groups)))
 	p = cross_val_predict(model(), x, y, groups=groups, cv=GroupKFold(folds), method="predict_proba")[:, 1]
 	predicted = p >= 0.5
@@ -117,7 +119,11 @@ def main() -> None:
 	for camera in sorted({row["camera_id"] for row in rows}):
 		pick = np.array([row["camera_id"] == camera for row in rows])
 		print(f"    {camera}: {(predicted[pick] == y[pick]).mean():.1%} of {pick.sum()}")
+	return p, (tp + tn) / len(y)
 
+
+def save_filter(x: np.ndarray, y: np.ndarray, accuracy: float, out: Path) -> None:
+	"""Fit on all examples and save the plant filter as plain JSON."""
 	final = model().fit(x, y)
 	scaler, logistic = final[0], final[1]
 	PlantFilter(
@@ -126,11 +132,26 @@ def main() -> None:
 		scale=scaler.scale_,
 		weights=logistic.coef_[0],
 		bias=float(logistic.intercept_[0]),
-		notes=f"{len(y)} labels ({int(y.sum())} plant), grouped CV accuracy {(tp + tn) / len(y):.3f}",
-	).save(args.out)
-	print(f"\nSaved {args.out}")
+		notes=f"{len(y)} labels ({int(y.sum())} plant), grouped CV accuracy {accuracy:.3f}",
+	).save(out)
+	print(f"\nSaved {out}")
 
-	wrong = [{**row, "p": float(pi)} for row, pi, ok in zip(rows, p, predicted == y, strict=True) if not ok]
+
+def main() -> None:
+	parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+	parser.add_argument("--frames-root", type=Path, required=True)
+	parser.add_argument("--dir", type=Path, default=Path("labels/plant_masks"))
+	parser.add_argument("--out", type=Path, default=Path("trained/plant_filter.json"))
+	parser.add_argument("--errors", type=Path, default=Path("data/checks/plant_filter_errors.jpg"))
+	args = parser.parse_args()
+
+	candidates, used = read_answers(args.dir)
+	rows, images, masks, x = load_examples(used, candidates, args.frames_root, args.dir / "masks.npz")
+	y = np.array([row["label"] == "plant" for row in rows])
+	p, accuracy = cross_validate(rows, x, y)
+	save_filter(x, y, accuracy, args.out)
+
+	wrong = [{**row, "p": float(pi)} for row, pi, ok in zip(rows, p, (p >= 0.5) == y, strict=True) if not ok]
 	wrong.sort(key=lambda r: -abs(r["p"] - 0.5))
 	error_sheet(wrong, images, masks, args.errors)
 	if wrong:

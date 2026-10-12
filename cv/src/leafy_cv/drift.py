@@ -24,6 +24,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from leafy_cv.frames import TIMESTAMP_STRIP_PX, WATERMARK_PX
+
 MAX_FEATURES = 2000
 MAX_MATCHES = 400
 RANSAC_THRESHOLD_PX = 2.5
@@ -94,8 +96,8 @@ def feature_mask(shape: tuple[int, int], regions: Sequence[Rect] | None = None) 
 			mask[max(0, y0) : min(height, y1), max(0, x0) : min(width, x1)] = 255
 	else:
 		mask = np.full(shape, 255, np.uint8)
-	mask[:40, :] = 0
-	mask[-40:, -160:] = 0
+	mask[:TIMESTAMP_STRIP_PX, :] = 0
+	mask[-WATERMARK_PX[1] :, -WATERMARK_PX[0] :] = 0
 	return mask
 
 
