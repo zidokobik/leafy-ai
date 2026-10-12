@@ -31,9 +31,10 @@ from pathlib import Path
 import numpy as np
 
 from leafy_cv.csv_files import write_csv
+from leafy_cv.readiness import CANDIDATE, EMPTY, GROWING, READY
 
-STATUSES = ("ready", "candidate", "growing", "empty")
-MISSED = ("growing", "empty")  # a crowded plant with these statuses gets no alert
+STATUSES = (READY, CANDIDATE, GROWING, EMPTY)
+MISSED = (GROWING, EMPTY)  # a crowded plant with these statuses gets no alert
 BOOTSTRAP = 2000
 THRESHOLDS = np.round(np.arange(0.20, 0.81, 0.05), 2)
 
@@ -80,12 +81,12 @@ def camera_report(rows: list[dict], weights: dict[str, float]) -> dict:
 		k = sum(r["label"] == "crowded" for r in part)
 		out["status"][status] = (k, len(part), *wilson(k, len(part)))
 	crowded = Counter(r["status"] for r in rows if r["label"] == "crowded")
-	out["caught"] = crowded["ready"]
-	out["candidate"] = crowded["candidate"]
+	out["caught"] = crowded[READY]
+	out["candidate"] = crowded[CANDIDATE]
 	out["missed"] = sum(crowded[s] for s in MISSED)
-	out["catch"] = weighted_catch(dict(crowded), weights, ("ready",))
-	out["catch_ci"] = catch_interval(rows, weights, ("ready",))
-	out["catch_with_candidate"] = weighted_catch(dict(crowded), weights, ("ready", "candidate"))
+	out["catch"] = weighted_catch(dict(crowded), weights, (READY,))
+	out["catch_ci"] = catch_interval(rows, weights, (READY,))
+	out["catch_with_candidate"] = weighted_catch(dict(crowded), weights, (READY, CANDIDATE))
 	return out
 
 
@@ -160,10 +161,10 @@ def main() -> None:
 	print("\n=== Empty ===")
 	for camera in sorted({r["camera_id"] for r in rows}):
 		part = [r for r in rows if r["camera_id"] == camera]
-		cv_empty = [r for r in part if r["status"] == "empty"]
+		cv_empty = [r for r in part if r["status"] == EMPTY]
 		said_empty = [r for r in part if r["label"] == "empty"]
 		human_empty_of_cv = sum(r["label"] == "empty" for r in cv_empty)
-		cv_empty_of_human = sum(r["status"] == "empty" for r in said_empty)
+		cv_empty_of_human = sum(r["status"] == EMPTY for r in said_empty)
 		print(
 			f"{camera}: CV empty {len(cv_empty)}, of which human 'empty' {human_empty_of_cv}; "
 			f"human 'empty' {len(said_empty)}, of which CV empty {cv_empty_of_human}"

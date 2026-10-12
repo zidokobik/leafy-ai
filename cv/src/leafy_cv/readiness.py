@@ -45,6 +45,7 @@ the change and its reason recorded.
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from itertools import pairwise
 from statistics import median_low
 
@@ -57,12 +58,29 @@ SMOOTH_FRAMES = 3
 RULE_VERSION = "rule-v5"  # v3 (8 Oct): zones smoothed like holes; v4: lower value when the window has 2;
 # v5 (12 Oct): contact in both directions (same channel and next channel); thresholds unchanged
 
-EMPTY, GROWING, CANDIDATE, READY, UNCERTAIN = "empty", "growing", "candidate", "ready", "uncertain"
+
+class HoleStatus(StrEnum):
+	"""The plant_observations.status values (written to the CSVs as these strings)."""
+
+	EMPTY = "empty"
+	GROWING = "growing"
+	CANDIDATE = "candidate"
+	READY = "ready"
+	UNCERTAIN = "uncertain"
+
+
+EMPTY, GROWING, CANDIDATE, READY, UNCERTAIN = (
+	HoleStatus.EMPTY,
+	HoleStatus.GROWING,
+	HoleStatus.CANDIDATE,
+	HoleStatus.READY,
+	HoleStatus.UNCERTAIN,
+)
 
 
 @dataclass(frozen=True)
 class Status:
-	status: str
+	status: HoleStatus
 	confirmed_frames: int  # length of the current crowded streak (0 when not crowded)
 
 
@@ -78,6 +96,24 @@ def rolling_median(values: Sequence[float | None], frames: int) -> list[float | 
 	return out
 
 
+def crowding_statuses(
+	values: Sequence[float | None], threshold: float, empty: Sequence[bool] | None = None
+) -> list[Status]:
+	"""The streak rule shared by holes and zones, frame by frame (oldest first): no value -> uncertain; `empty` ->
+	empty; otherwise crowded at `threshold` or more (once crowded, until HYSTERESIS below it), and ready after
+	CONFIRM_FRAMES crowded frames in a row."""
+	out, streak, crowded = [], 0, False
+	for k, value in enumerate(values):
+		if value is None or (empty is not None and empty[k]):
+			out.append(Status(UNCERTAIN if value is None else EMPTY, 0))
+			streak, crowded = 0, False
+			continue
+		crowded = value >= (threshold - HYSTERESIS if crowded else threshold)
+		streak = streak + 1 if crowded else 0
+		out.append(Status((READY if streak >= CONFIRM_FRAMES else CANDIDATE) if crowded else GROWING, streak))
+	return out
+
+
 def hole_statuses(
 	coverage: Sequence[float],
 	contact: Sequence[float | None],
@@ -90,21 +126,8 @@ def hole_statuses(
 		raise ValueError("coverage and contact need one value per frame")
 	if not reliable:
 		return [Status(UNCERTAIN, 0) for _ in coverage]
-	out, streak, crowded = [], 0, False
-	for cov, touch in zip(coverage, rolling_median(contact, smooth_frames), strict=True):
-		if touch is None:
-			out.append(Status(UNCERTAIN, 0))
-			streak, crowded = 0, False
-			continue
-		if cov < EMPTY_COVERAGE:
-			out.append(Status(EMPTY, 0))
-			streak, crowded = 0, False
-			continue
-		crowded = touch >= (CONTACT_CROWDED - HYSTERESIS if crowded else CONTACT_CROWDED)
-		streak = streak + 1 if crowded else 0
-		status = (READY if streak >= CONFIRM_FRAMES else CANDIDATE) if crowded else GROWING
-		out.append(Status(status, streak))
-	return out
+	empty = [cov < EMPTY_COVERAGE for cov in coverage]
+	return crowding_statuses(rolling_median(contact, smooth_frames), CONTACT_CROWDED, empty)
 
 
 def zone_statuses(
@@ -115,20 +138,9 @@ def zone_statuses(
 	"""Statuses of one zone over its usable frames, oldest first: a closed canopy is crowded.
 
 	Closure is smoothed like hole contact. NaN (zone not measurable) becomes None first, because
-	rolling_median skips None but would put a NaN inside the median; it stays NaN (uncertain) after."""
+	rolling_median skips None but would put a NaN inside the median; it stays None (uncertain) after."""
 	present = [None if math.isnan(v) else v for v in closure]
-	smoothed = [float("nan") if v is None else v for v in rolling_median(present, smooth_frames)]
-	out, streak, closed = [], 0, False
-	for value in smoothed:
-		if math.isnan(value):  # zone not measurable
-			out.append(Status(UNCERTAIN, 0))
-			streak, closed = 0, False
-			continue
-		closed = value >= (ZONE_CLOSED - HYSTERESIS if closed else ZONE_CLOSED)
-		streak = streak + 1 if closed else 0
-		status = (READY if streak >= CONFIRM_FRAMES else CANDIDATE) if closed else GROWING
-		out.append(Status(status, streak))
-	return out
+	return crowding_statuses(rolling_median(present, smooth_frames), ZONE_CLOSED)
 
 
 def flip_rate(statuses: Sequence[str], days: float) -> float:

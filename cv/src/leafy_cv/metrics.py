@@ -106,13 +106,39 @@ def choose_outline(result: PointMasks, probabilities: np.ndarray, cell_area: int
 	return min(plant, key=lambda k: areas[k]), OVERSIZED_OUTLINE
 
 
-def score_outlines(image_bgr: np.ndarray, layers: ImageLayers, result: PointMasks, plant_filter: PlantFilter):
+@dataclass(frozen=True)
+class KeptOutline:
+	"""The outline kept for one hole: its index among MobileSAM's candidates (-1 = none was plant), the flag
+	explaining the choice ("" = nothing to report), the plant filter's P(plant) and its pixels."""
+
+	index: int
+	flag: str
+	p_plant: float | None
+	mask: np.ndarray | None
+
+
+def outline_features(image_bgr: np.ndarray, layers: ImageLayers, mask: np.ndarray) -> np.ndarray | None:
+	"""The plant filter's features of one candidate outline; None for an outline too small to judge."""
+	return None if mask.sum() < MIN_MASK_PIXELS else mask_features(image_bgr, mask, layers)
+
+
+def score_outlines(
+	image_bgr: np.ndarray, layers: ImageLayers, result: PointMasks, plant_filter: PlantFilter
+) -> np.ndarray:
 	"""P(plant) for each of the three candidates (0 for outlines too small to judge)."""
-	scores = np.zeros(len(result.masks))
-	for k, mask in enumerate(result.masks):
-		if mask.sum() >= MIN_MASK_PIXELS:
-			scores[k] = float(plant_filter.probability(mask_features(image_bgr, mask, layers))[0])
-	return scores
+	features = (outline_features(image_bgr, layers, mask) for mask in result.masks)
+	return np.array([0.0 if f is None else float(plant_filter.probability(f)[0]) for f in features])
+
+
+def keep_outline(
+	image_bgr: np.ndarray, layers: ImageLayers, result: PointMasks, cell_area: int, plant_filter: PlantFilter
+) -> KeptOutline:
+	"""Score a hole's candidates and keep one (choose_outline)."""
+	scores = score_outlines(image_bgr, layers, result, plant_filter)
+	k, flag = choose_outline(result, scores, cell_area, plant_filter.threshold)
+	if k < 0:
+		return KeptOutline(-1, flag, None, None)
+	return KeptOutline(k, flag, float(scores[k]), result.masks[k])
 
 
 def zone_points(hole_map: HoleMap) -> dict[str, np.ndarray]:
@@ -131,10 +157,8 @@ def zone_points(hole_map: HoleMap) -> dict[str, np.ndarray]:
 
 def point_on_plant(image_bgr: np.ndarray, layers: ImageLayers, result: PointMasks, plant_filter: PlantFilter) -> bool:
 	"""A zone grid point counts as plant when the filter calls any of its candidate outlines plant."""
-	for mask in result.masks:
-		if mask.sum() >= MIN_MASK_PIXELS and plant_filter.is_plant(mask_features(image_bgr, mask, layers))[0]:
-			return True
-	return False
+	features = (outline_features(image_bgr, layers, mask) for mask in result.masks)
+	return any(f is not None and bool(plant_filter.is_plant(f)[0]) for f in features)
 
 
 def zone_closure(
@@ -162,48 +186,44 @@ def measure_frame(
 	if (width, height) != tuple(hole_map.image_size):
 		raise ValueError(f"frame is {width}x{height} but the hole map is for {hole_map.image_size}")
 
-	points = np.array([(h.x, h.y) for h in hole_map.holes], np.float32)
 	negatives = [cells.prompt_negatives(i) for i in range(len(hole_map.holes))]
 	segmenter.set_image(image_bgr)
-	results = segmenter.predict(points, negatives)
+	results = segmenter.predict(hole_map.centres(), negatives)
 
 	layers = ImageLayers.of(image_bgr)
 	areas = cells.areas()
-	chosen, flags, probabilities = [], [], []
-	for i, result in enumerate(results):
-		scores = score_outlines(image_bgr, layers, result, plant_filter)
-		k, flag = choose_outline(result, scores, int(areas[i]), plant_filter.threshold)
-		chosen.append(result.masks[k] if k >= 0 else None)
-		flags.append((k, flag))
-		probabilities.append(float(scores[k]) if k >= 0 else None)
-
-	plant_mask = np.zeros((height, width), bool)
-	for outline in chosen:
-		if outline is not None:
-			if outline.shape != plant_mask.shape:
-				raise ValueError(f"MobileSAM outline is {outline.shape}, the frame {plant_mask.shape}")
-			plant_mask |= outline
-
+	kept = [keep_outline(image_bgr, layers, result, int(areas[i]), plant_filter) for i, result in enumerate(results)]
+	plant_mask = union_of_outlines(kept, (height, width))
 	contacts = pair_contact(plant_mask, cells)
 	holes = []
-	for i, hole in enumerate(hole_map.holes):
+	for i, (hole, outline) in enumerate(zip(hole_map.holes, kept, strict=True)):
 		cell = cells.cell(i)
-		k, flag = flags[i]
 		holes.append(
 			HoleMeasure(
 				hole_id=hole.hole_id,
 				coverage=float(plant_mask[cell].mean()) if cell.any() else 0.0,
 				boundary_contact=hole_contact(contacts, cells.pairs_of(i)),
-				plant_area_px=int(chosen[i].sum()) if chosen[i] is not None else 0,
-				outline=k,
-				p_plant=probabilities[i],
-				flags=(flag,) if flag else (),
+				plant_area_px=int(outline.mask.sum()) if outline.mask is not None else 0,
+				outline=outline.index,
+				p_plant=outline.p_plant,
+				flags=(outline.flag,) if outline.flag else (),
 			)
 		)
 
 	zones = zone_closure(image_bgr, layers, hole_map, segmenter, plant_filter)
 	runtime_ms = int((time.perf_counter() - start) * 1000)
 	return FrameMeasure(holes=holes, zones=zones, plant_mask=plant_mask, runtime_ms=runtime_ms)
+
+
+def union_of_outlines(kept: list[KeptOutline], shape: tuple[int, int]) -> np.ndarray:
+	"""(height, width) bool: the frame's plant pixels, the union of the kept outlines of all holes."""
+	plant_mask = np.zeros(shape, bool)
+	for outline in kept:
+		if outline.mask is not None:
+			if outline.mask.shape != plant_mask.shape:
+				raise ValueError(f"MobileSAM outline is {outline.mask.shape}, the frame {plant_mask.shape}")
+			plant_mask |= outline.mask
+	return plant_mask
 
 
 def line_closed(on_plant: np.ndarray, min_run: int) -> bool:

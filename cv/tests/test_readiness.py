@@ -1,11 +1,14 @@
 import pytest
 
+from leafy_cv.frame_index import FrameStatus
+from leafy_cv.hole_map import Direction
 from leafy_cv.readiness import (
 	CANDIDATE,
 	EMPTY,
 	GROWING,
 	READY,
 	UNCERTAIN,
+	HoleStatus,
 	flip_rate,
 	hole_statuses,
 	rolling_median,
@@ -116,3 +119,12 @@ def test_one_odd_frame_is_smoothed_away():
 	assert names(hole_statuses([0.5] * 6, contact, smooth_frames=1)) == [GROWING, *smoothed[2:], READY]
 	# the window is the last 3 frames; a frame without a value just has nothing to add
 	assert rolling_median([0.1, None, 0.9, 0.5], 3) == [0.1, None, 0.1, 0.5]
+
+
+def test_status_names_are_the_strings_the_backend_reads():
+	# the CSVs carry these exact words (observations / gaps: the plant_observations contract), so they must not change
+	assert [s.value for s in HoleStatus] == ["empty", "growing", "candidate", "ready", "uncertain"]
+	assert [str(d) for d in Direction] == ["along", "across"]
+	assert f"{READY}" == str(READY) == "ready" and READY == "ready"
+	statuses = ["ok", "transient_shift", "camera_moved", "scene_changed", "unstable", "unconfirmed"]
+	assert [s.value for s in FrameStatus] == statuses  # frame_index.csv

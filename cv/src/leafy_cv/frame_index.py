@@ -21,17 +21,26 @@ Each frame is compared with the last frame we trust (the "anchor"):
 import csv
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from leafy_cv.drift import Alignment
 from leafy_cv.hole_map import HoleMap
 
-OK = "ok"
-TRANSIENT_SHIFT = "transient_shift"
-CAMERA_MOVED = "camera_moved"
-SCENE_CHANGED = "scene_changed"
-UNSTABLE = "unstable"
-UNCONFIRMED = "unconfirmed"
+
+class FrameStatus(StrEnum):
+	"""A frame's status in data/frame_index.csv (written as these strings)."""
+
+	OK = "ok"
+	TRANSIENT_SHIFT = "transient_shift"
+	CAMERA_MOVED = "camera_moved"
+	SCENE_CHANGED = "scene_changed"
+	UNSTABLE = "unstable"
+	UNCONFIRMED = "unconfirmed"
+
+
+OK, TRANSIENT_SHIFT, CAMERA_MOVED = FrameStatus.OK, FrameStatus.TRANSIENT_SHIFT, FrameStatus.CAMERA_MOVED
+SCENE_CHANGED, UNSTABLE, UNCONFIRMED = FrameStatus.SCENE_CHANGED, FrameStatus.UNSTABLE, FrameStatus.UNCONFIRMED
 
 # Frames that are safe to analyse. The first frame of a new period is fine: it just needs
 # that period's hole map.
@@ -41,26 +50,26 @@ USABLE_STATUSES = {OK, CAMERA_MOVED, SCENE_CHANGED}
 @dataclass
 class FrameLabel:
 	index: int
-	status: str
+	status: FrameStatus
 	period: int
-	compared_with: int | None
-	inliers: int | None
-	shift_px: float | None
-	rotation_deg: float | None
-	plant_change: float | None = None
+	compared_with: int | None  # the frame it was compared with (None for the first frame)
+	alignment: Alignment | None = None  # how it compared with that frame
 
+	@property
+	def inliers(self) -> int | None:
+		return self.alignment.inliers if self.alignment else None
 
-def _label(index: int, status: str, period: int, compared_with: int | None, alignment: Alignment | None) -> FrameLabel:
-	return FrameLabel(
-		index=index,
-		status=status,
-		period=period,
-		compared_with=compared_with,
-		inliers=alignment.inliers if alignment else None,
-		shift_px=alignment.shift_px if alignment else None,
-		rotation_deg=alignment.rotation_deg if alignment else None,
-		plant_change=alignment.plant_change if alignment else None,
-	)
+	@property
+	def shift_px(self) -> float | None:
+		return self.alignment.shift_px if self.alignment else None
+
+	@property
+	def rotation_deg(self) -> float | None:
+		return self.alignment.rotation_deg if self.alignment else None
+
+	@property
+	def plant_change(self) -> float | None:
+		return self.alignment.plant_change if self.alignment else None
 
 
 def label_sequence(
@@ -75,7 +84,7 @@ def label_sequence(
 	can_anchor = list(can_anchor) if can_anchor is not None else [True] * frame_count
 	if frame_count == 0:
 		return []
-	labels = [_label(0, OK, 1, None, None)]
+	labels = [FrameLabel(0, OK, 1, None, None)]
 	anchor, pending, period = 0, None, 1
 	pending_vs_anchor: Alignment | None = None
 
@@ -85,7 +94,7 @@ def label_sequence(
 			if pending is not None:
 				labels[pending].status = TRANSIENT_SHIFT
 				pending = None
-			labels.append(_label(i, OK, period, anchor, vs_anchor))
+			labels.append(FrameLabel(i, OK, period, anchor, vs_anchor))
 			if can_anchor[i]:
 				anchor = i
 			continue
@@ -97,12 +106,12 @@ def label_sequence(
 				start = labels[pending]
 				start.status = CAMERA_MOVED if pending_vs_anchor.clear_move else SCENE_CHANGED
 				start.period = period
-				labels.append(_label(i, OK, period, pending, vs_pending))
+				labels.append(FrameLabel(i, OK, period, pending, vs_pending))
 				anchor, pending = i, None
 				continue
 			labels[pending].status = UNSTABLE
 
-		labels.append(_label(i, UNCONFIRMED, period, anchor, vs_anchor))
+		labels.append(FrameLabel(i, UNCONFIRMED, period, anchor, vs_anchor))
 		pending, pending_vs_anchor = i, vs_anchor
 
 	return labels

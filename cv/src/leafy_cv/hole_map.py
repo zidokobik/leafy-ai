@@ -38,6 +38,7 @@ Rows are numbered by distance from the camera: row 1 is the farthest mapped row.
 import json
 import re
 from dataclasses import asdict, dataclass, field
+from enum import StrEnum
 from itertools import pairwise
 from pathlib import Path
 
@@ -52,8 +53,16 @@ CELL_RADIUS_FACTOR = 0.65  # x local spacing; a square grid's Voronoi corner sit
 # parallel lines from one plant centre to the other.
 CORRIDOR_WIDTH_FACTOR = 0.8
 GAP_LINES = 9
-# Directions of a pair: two plants in the same channel (expansion separates them) or in adjacent channels.
-ALONG, ACROSS = "along", "across"
+
+
+class Direction(StrEnum):
+	"""Direction of a pair of plants: in the same channel (expansion separates them) or in adjacent channels."""
+
+	ALONG = "along"
+	ACROSS = "across"
+
+
+ALONG, ACROSS = Direction.ALONG, Direction.ACROSS
 # Same-channel pairs: a gap longer than this x every adjacent gap in its channel is skipped (a hole missing
 # from the map). Compared with the adjacent gaps, not the channel's median, because perspective makes the
 # spacing change along a channel: camera 3's channels run 21-104 px, its nearest gaps 1.5-2.5x the median,
@@ -132,6 +141,10 @@ class HoleMap:
 		"""The channel a hole sits in (its row or its column, depending on channel_axis)."""
 		return hole.row if self.channel_axis == "row" else hole.col
 
+	def centres(self, dtype=np.float32) -> np.ndarray:
+		"""(n, 2) hole centres (x, y), in the order of `holes`."""
+		return np.array([(h.x, h.y) for h in self.holes], dtype=dtype)
+
 	@classmethod
 	def load(cls, path: Path) -> "HoleMap":
 		data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -196,6 +209,49 @@ def number_holes(level: int, camera: int, rows: list[list[tuple[float, float, bo
 	return holes
 
 
+def distance_matrix(centres: np.ndarray) -> np.ndarray:
+	"""(n, n) distances between the centres (in their own precision), inf on the diagonal."""
+	distances = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2)
+	np.fill_diagonal(distances, np.inf)
+	return distances
+
+
+def principal_axes(points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+	"""The points centred on their mean, and their main directions (PCA; row 0 = the longest)."""
+	centred = points - points.mean(axis=0)
+	return centred, np.linalg.svd(centred, full_matrices=False)[2]
+
+
+def unit_and_normal(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+	"""Unit vector from a to b, the unit vector at right angles to it, and the distance."""
+	a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
+	length = float(np.linalg.norm(b - a))
+	u = (b - a) / length
+	return u, np.array([-u[1], u[0]]), length
+
+
+def inside_frame(points: np.ndarray, width: int, height: int) -> np.ndarray:
+	"""(n,) bool: which (x, y) points lie inside a width x height frame."""
+	return (points[:, 0] >= 0) & (points[:, 0] < width) & (points[:, 1] >= 0) & (points[:, 1] < height)
+
+
+def polygon_mask(polygon, image_size: tuple[int, int]) -> np.ndarray:
+	"""(height, width) bool mask of a polygon's inside."""
+	width, height = image_size
+	mask = np.zeros((height, width), np.uint8)
+	cv2.fillPoly(mask, [np.array(polygon, np.int32)], 1)
+	return mask > 0
+
+
+def two_way(pairs, n: int) -> list[set[int]]:
+	"""Per hole, the holes it is paired with, from (i, j) pairs."""
+	partners: list[set[int]] = [set() for _ in range(n)]
+	for i, j in pairs:
+		partners[i].add(j)
+		partners[j].add(i)
+	return partners
+
+
 def row_problems(hole_map: HoleMap) -> list[str]:
 	"""Rows whose holes don't lie on one smooth curve, and dots that sit on top of each other.
 
@@ -204,22 +260,21 @@ def row_problems(hole_map: HoleMap) -> list[str]:
 	only checked for duplicates.
 	"""
 	problems = []
-	centres = np.array([(h.x, h.y) for h in hole_map.holes], dtype=np.float64)
+	centres = hole_map.centres(np.float64)
 	if len(centres) >= 2:
-		distances = np.linalg.norm(centres[:, None] - centres[None, :], axis=2)
-		np.fill_diagonal(distances, np.inf)
+		distances = distance_matrix(centres)
 		spacing = np.sort(distances, axis=1)[:, : min(2, len(centres) - 1)].mean(axis=1)
 		for i, j in zip(*np.nonzero(distances < MIN_DOT_DISTANCE_FACTOR * spacing[:, None]), strict=True):
 			if i < j:
 				a, b = hole_map.holes[i], hole_map.holes[j]
 				problems.append(f"{a.hole_id} and {b.hole_id} are only {distances[i, j]:.0f} px apart (clicked twice?)")
 
-	for row in sorted({h.row for h in hole_map.holes}):
-		points = np.array([(h.x, h.y) for h in hole_map.holes if h.row == row], dtype=np.float64)
+	rows = np.array([h.row for h in hole_map.holes])
+	for row in sorted(set(rows.tolist())):
+		points = centres[rows == row]
 		if len(points) < 4:
 			continue
-		centred = points - points.mean(axis=0)
-		_, _, axes = np.linalg.svd(centred, full_matrices=False)
+		centred, axes = principal_axes(points)
 		along, across = centred @ axes[0], centred @ axes[1]
 		curve = np.polyval(np.polyfit(along, across, 2), along)
 		row_spacing = np.median(np.diff(np.sort(along)))
@@ -269,9 +324,9 @@ class Cells:
 	# per pair (i, j), i < j, in both directions: the GAP_LINES lines across its corridor, each an (n, 2) array
 	# of (x, y) pixels from i's centre to j's (lines leaving the frame are dropped). "across" pairs come first.
 	pair_lines: dict[tuple[int, int], list[np.ndarray]] = field(default_factory=dict)
-	pair_direction: dict[tuple[int, int], str] = field(default_factory=dict)  # ALONG or ACROSS per pair
+	pair_direction: dict[tuple[int, int], Direction] = field(default_factory=dict)  # ALONG or ACROSS per pair
 
-	def pairs_of(self, i: int, direction: str | None = None) -> list[tuple[int, int]]:
+	def pairs_of(self, i: int, direction: Direction | None = None) -> list[tuple[int, int]]:
 		"""Hole i's pairs, in both directions (or only ALONG / ACROSS)."""
 		return [p for p in self.pair_lines if i in p and (direction is None or self.pair_direction[p] == direction)]
 
@@ -303,33 +358,56 @@ def in_frame_share(centres: np.ndarray, radii: np.ndarray, width: int, height: i
 	unit = np.stack([grid_x[inside_disk], grid_y[inside_disk]], axis=1)  # points of a unit disk
 	shares = []
 	for (cx, cy), radius in zip(centres, radii, strict=True):
-		points = unit * radius + (cx, cy)
-		inside = (points[:, 0] >= 0) & (points[:, 0] < width) & (points[:, 1] >= 0) & (points[:, 1] < height)
-		shares.append(inside.mean())
+		shares.append(inside_frame(unit * radius + (cx, cy), width, height).mean())
 	return np.array(shares)
 
 
 def zone_mask(zone: Zone, image_size: tuple[int, int]) -> np.ndarray:
 	"""(height, width) bool mask of a zone's polygon."""
-	width, height = image_size
-	mask = np.zeros((height, width), np.uint8)
-	cv2.fillPoly(mask, [np.array(zone.polygon, np.int32)], 1)
-	return mask > 0
+	return polygon_mask(zone.polygon, image_size)
 
 
 def build_cells(hole_map: HoleMap) -> Cells:
+	"""Cells, neighbours, plant pairs in both directions and their gap corridors (see the module docstring)."""
 	holes = hole_map.holes
 	if len(holes) < MIN_HOLES:
 		raise ValueError(f"Need at least {MIN_HOLES} holes to build cells, got {len(holes)}")
 	width, height = hole_map.image_size
-	centres = np.array([(h.x, h.y) for h in holes], dtype=np.float32)
+	centres = hole_map.centres()
+	distances = distance_matrix(centres)
+	spacing = np.sort(distances, axis=1)[:, :2].mean(axis=1)  # local spacing: mean distance to the 2 nearest holes
+	labels = voronoi_labels(centres, spacing, (height, width))
+	if hole_map.board_polygon:
+		labels[~polygon_mask(hole_map.board_polygon, hole_map.image_size)] = -1
 
-	# Local spacing = mean distance to the two nearest other holes.
-	distances = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2)
-	np.fill_diagonal(distances, np.inf)
-	spacing = np.sort(distances, axis=1)[:, :2].mean(axis=1)
+	channels = np.array([hole_map.channel(h) for h in holes])
+	distances = distances.astype(np.float64)
+	along = along_channel_spacing(channels, distances)
+	facing = cross_channel_neighbours(centres, channels, distances, along)
+	# a pair is kept if either hole picked the other (the facing rule isn't symmetric under perspective)
+	across_pairs = sorted({(min(i, j), max(i, j)) for i in range(len(holes)) for j in facing[i]})
+	along_pairs = same_channel_pairs(centres, channels)
+	pair_lines, pair_direction, corridors = gap_corridors(
+		centres, channels, along, {ACROSS: across_pairs, ALONG: along_pairs}, (height, width)
+	)
+	return Cells(
+		labels=labels,
+		spacing=spacing,
+		in_frame=in_frame_share(centres, CELL_RADIUS_FACTOR * spacing, width, height),
+		neighbours=touching_cells(labels, len(holes)),
+		facing=facing,
+		cross_neighbours=two_way(across_pairs, len(holes)),
+		along_neighbours=two_way(along_pairs, len(holes)),
+		corridors=corridors,
+		pair_lines=pair_lines,
+		pair_direction=pair_direction,
+	)
 
-	# Nearest hole for every pixel, in row chunks to keep memory small.
+
+def voronoi_labels(centres: np.ndarray, spacing: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+	"""(height, width) int32: the nearest hole of every pixel, -1 further than CELL_RADIUS_FACTOR x its spacing.
+	Computed in row chunks to keep memory small."""
+	height, width = shape
 	labels = np.empty((height, width), dtype=np.int32)
 	xs = np.arange(width, dtype=np.float32)
 	for y0 in range(0, height, 64):
@@ -340,60 +418,43 @@ def build_cells(hole_map: HoleMap) -> Cells:
 		nearest_d = np.sqrt(np.take_along_axis(d2, nearest[..., None], axis=2)[..., 0])
 		nearest[nearest_d > CELL_RADIUS_FACTOR * spacing[nearest]] = -1
 		labels[y0 : y0 + len(ys)] = nearest
+	return labels
 
-	if hole_map.board_polygon:
-		board = np.zeros((height, width), np.uint8)
-		cv2.fillPoly(board, [np.array(hole_map.board_polygon, np.int32)], 1)
-		labels[board == 0] = -1
 
-	# Neighbours: labels that touch horizontally or vertically.
-	neighbours: list[set[int]] = [set() for _ in holes]
+def touching_cells(labels: np.ndarray, n: int) -> list[set[int]]:
+	"""Per hole, the holes whose cells touch its cell horizontally or vertically."""
+	touching_pairs = set()
 	for a, b in ((labels[:, :-1], labels[:, 1:]), (labels[:-1, :], labels[1:, :])):
 		touching = (a != b) & (a >= 0) & (b >= 0)
-		for i, j in set(zip(a[touching].tolist(), b[touching].tolist(), strict=True)):
-			neighbours[i].add(j)
-			neighbours[j].add(i)
+		touching_pairs |= set(zip(a[touching].tolist(), b[touching].tolist(), strict=True))
+	return two_way(touching_pairs, n)
 
-	channels = np.array([hole_map.channel(h) for h in holes])
-	facing = cross_channel_neighbours(centres, channels)
-	cross = [set(f) for f in facing]
-	along = along_channel_spacing(centres, channels, distances)
-	# a pair is kept if either hole picked the other (the facing rule isn't symmetric under perspective)
-	pairs = sorted({(min(i, j), max(i, j)) for i in range(len(holes)) for j in cross[i]})
-	for i, j in pairs:
-		cross[i].add(j)
-		cross[j].add(i)
-	along_pairs = same_channel_pairs(centres, channels)
-	along_neighbours: list[set[int]] = [set() for _ in holes]
-	for i, j in along_pairs:
-		along_neighbours[i].add(j)
-		along_neighbours[j].add(i)
-	pair_lines, pair_direction, corridors = {}, {}, [np.zeros((height, width), bool) for _ in holes]
-	for direction, pair_list in ((ACROSS, pairs), (ALONG, along_pairs)):
-		for i, j in pair_list:
+
+def gap_corridors(
+	centres: np.ndarray,
+	channels: np.ndarray,
+	along: np.ndarray,
+	pairs: dict[Direction, list[tuple[int, int]]],
+	shape: tuple[int, int],
+) -> tuple[dict[tuple[int, int], list[np.ndarray]], dict[tuple[int, int], Direction], list[np.ndarray]]:
+	"""Per pair: its GAP_LINES lines and its direction ("across" pairs first); per hole: the area of its corridors.
+
+	A corridor is CORRIDOR_WIDTH_FACTOR x the two holes' along-channel spacing wide; along a channel also at most
+	CORRIDOR_WIDTH_FACTOR x the distance to the next channel, so its outer lines stay out of that channel's plants."""
+	pair_lines, pair_direction = {}, {}
+	corridors = [np.zeros(shape, bool) for _ in centres]
+	for direction in (ACROSS, ALONG):
+		for i, j in pairs[direction]:
 			corridor_width = CORRIDOR_WIDTH_FACTOR * np.nanmean([along[i], along[j]])
 			if direction == ALONG:
 				clearance = next_channel_clearance(centres, channels, i, j)
 				corridor_width = min(corridor_width, CORRIDOR_WIDTH_FACTOR * clearance)
-			pair_lines[(i, j)] = corridor_lines(centres[i], centres[j], corridor_width, (height, width))
+			pair_lines[(i, j)] = corridor_lines(centres[i], centres[j], corridor_width, shape)
 			pair_direction[(i, j)] = direction
-			mask = corridor_mask(centres[i], centres[j], corridor_width, (height, width))
+			mask = corridor_mask(centres[i], centres[j], corridor_width, shape)
 			corridors[i] |= mask
 			corridors[j] |= mask
-
-	in_frame = in_frame_share(centres, CELL_RADIUS_FACTOR * spacing, width, height)
-	return Cells(
-		labels=labels,
-		spacing=spacing,
-		in_frame=in_frame,
-		neighbours=neighbours,
-		facing=facing,
-		cross_neighbours=cross,
-		along_neighbours=along_neighbours,
-		corridors=corridors,
-		pair_lines=pair_lines,
-		pair_direction=pair_direction,
-	)
+	return pair_lines, pair_direction, corridors
 
 
 def same_channel_pairs(centres: np.ndarray, channels: np.ndarray) -> list[tuple[int, int]]:
@@ -408,10 +469,8 @@ def same_channel_pairs(centres: np.ndarray, channels: np.ndarray) -> list[tuple[
 		members = np.nonzero(channels == channel)[0]
 		if len(members) < 2:
 			continue
-		points = centres[members].astype(np.float64)
-		centred = points - points.mean(axis=0)
-		axis = np.linalg.svd(centred, full_matrices=False)[2][0]
-		ordered = members[np.argsort(centred @ axis, kind="stable")]
+		centred, axes = principal_axes(centres[members].astype(np.float64))
+		ordered = members[np.argsort(centred @ axes[0], kind="stable")]
 		gaps = [float(np.linalg.norm(centres[b] - centres[a])) for a, b in pairwise(ordered)]
 		for k, gap in enumerate(gaps):
 			adjacent = gaps[max(0, k - 1) : k] + gaps[k + 1 : k + 2]
@@ -425,10 +484,8 @@ def same_channel_pairs(centres: np.ndarray, channels: np.ndarray) -> list[tuple[
 def next_channel_clearance(centres: np.ndarray, channels: np.ndarray, i: int, j: int) -> float:
 	"""Distance from the line between same-channel holes i and j to the nearest hole of another channel that
 	sits beside it (its position along the line within a quarter of the gap past either end); inf if none."""
-	a, b = centres[i].astype(np.float64), centres[j].astype(np.float64)
-	length = float(np.linalg.norm(b - a))
-	u = (b - a) / length
-	v = np.array([-u[1], u[0]])
+	a = centres[i].astype(np.float64)
+	u, v, length = unit_and_normal(a, centres[j])
 	clearance = np.inf
 	for k in np.nonzero(channels != channels[i])[0]:
 		offset = centres[k].astype(np.float64) - a
@@ -437,15 +494,16 @@ def next_channel_clearance(centres: np.ndarray, channels: np.ndarray, i: int, j:
 	return clearance
 
 
-def cross_channel_neighbours(centres: np.ndarray, channels: np.ndarray) -> list[set[int]]:
+def cross_channel_neighbours(
+	centres: np.ndarray, channels: np.ndarray, distances: np.ndarray, along: np.ndarray
+) -> list[set[int]]:
 	"""For each hole, the nearest hole(s) in each adjacent channel (channel number +-1).
 
 	Channel numbers are rows or columns, which are numbered in order across the board, so +-1 is the
-	channel next to it.
+	channel next to it. `distances`: distance_matrix(centres) (compared in float64, as always); `along`:
+	along_channel_spacing.
 	"""
-	distances = np.linalg.norm(centres[:, None, :] - centres[None, :, :], axis=2).astype(np.float64)
-	np.fill_diagonal(distances, np.inf)
-	along = along_channel_spacing(centres, channels, distances)
+	distances = np.asarray(distances, dtype=np.float64)
 	cross: list[set[int]] = [set() for _ in centres]
 	for i in range(len(centres)):
 		direction = channel_direction(centres, channels, distances, i)
@@ -475,12 +533,12 @@ def channel_direction(centres: np.ndarray, channels: np.ndarray, distances: np.n
 	return vector / np.linalg.norm(vector)
 
 
-def along_channel_spacing(centres: np.ndarray, channels: np.ndarray, distances: np.ndarray) -> np.ndarray:
+def along_channel_spacing(channels: np.ndarray, distances: np.ndarray) -> np.ndarray:
 	"""(n,) distance to the nearest hole in the same channel; for a hole alone in its channel, the
 	distance to its nearest hole at all."""
-	along = np.empty(len(centres))
-	for i in range(len(centres)):
-		same = (channels == channels[i]) & (np.arange(len(centres)) != i)
+	along = np.empty(len(channels))
+	for i in range(len(channels)):
+		same = (channels == channels[i]) & (np.arange(len(channels)) != i)
 		along[i] = distances[i, same].min() if same.any() else distances[i].min()
 	return along
 
@@ -488,8 +546,8 @@ def along_channel_spacing(centres: np.ndarray, channels: np.ndarray, distances: 
 def corridor_mask(a: np.ndarray, b: np.ndarray, corridor_width: float, shape: tuple[int, int]) -> np.ndarray:
 	"""(height, width) bool: the rectangle from centre a to centre b, corridor_width wide."""
 	a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
-	u = (b - a) / np.linalg.norm(b - a)
-	v = np.array([-u[1], u[0]]) * corridor_width / 2
+	_, normal, _ = unit_and_normal(a, b)
+	v = normal * corridor_width / 2
 	corners = np.round(np.array([a - v, b - v, b + v, a + v])).astype(np.int32)
 	mask = np.zeros(shape, np.uint8)
 	cv2.fillPoly(mask, [corners], 1)
@@ -500,16 +558,13 @@ def corridor_lines(a: np.ndarray, b: np.ndarray, corridor_width: float, shape: t
 	"""GAP_LINES parallel lines from centre a to centre b, spread across corridor_width, as (n, 2) integer
 	(x, y) pixels one px apart. Lines that leave the frame are left out."""
 	a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
-	length = np.linalg.norm(b - a)
-	u = (b - a) / length
-	v = np.array([-u[1], u[0]])
+	_, v, length = unit_and_normal(a, b)
 	steps = np.linspace(0.0, 1.0, int(np.ceil(length)) + 1)[:, None]
 	height, width = shape
 	lines = []
 	for offset in np.linspace(-corridor_width / 2, corridor_width / 2, GAP_LINES):
 		points = np.round(a + steps * (b - a) + offset * v).astype(np.int64)
-		inside = (points[:, 0] >= 0) & (points[:, 0] < width) & (points[:, 1] >= 0) & (points[:, 1] < height)
-		if inside.all():
+		if inside_frame(points, width, height).all():
 			lines.append(points)
 	return lines
 

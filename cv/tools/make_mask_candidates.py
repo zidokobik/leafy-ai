@@ -111,7 +111,7 @@ def main() -> None:
 		height, width = image.shape[:2]
 		hole_map = find_hole_map(hole_maps, pick["camera_id"], pick["when"])
 		if hole_map is not None:
-			points = np.array([(h.x, h.y) for h in hole_map.holes], np.float32)
+			points = hole_map.centres()
 			negatives = [sorted(nb) for nb in build_cells(hole_map).neighbours]
 			hole_ids = [h.hole_id for h in hole_map.holes]
 		else:

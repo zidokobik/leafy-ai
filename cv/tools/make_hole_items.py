@@ -30,10 +30,11 @@ from collections import defaultdict
 from pathlib import Path
 
 from leafy_cv.csv_files import write_csv
+from leafy_cv.readiness import CANDIDATE, EMPTY, GROWING, READY
 
-QUOTAS = {"ready": 32, "growing": 32, "candidate": 12, "empty": 6}
+QUOTAS = {READY: 32, GROWING: 32, CANDIDATE: 12, EMPTY: 6}
 EARLY_CAMERA, EARLY_DAYS = "level1_camera2", ("2026-09-30", "2026-10-01")
-EARLY_QUOTAS = {"ready": 8, "growing": 4}  # of camera 2's ready / growing quotas
+EARLY_QUOTAS = {READY: 8, GROWING: 4}  # of camera 2's ready / growing quotas
 EARLY_FROM = "2026-09-30T11"  # the transfer: earlier 30 Sep frames are the old layout
 GROWING_BINS = (0.0, 0.2, 0.35, 0.5, 1.01)  # contact bins the growing crops are spread over
 
@@ -52,14 +53,14 @@ def read_pool(runs: Path, training_frames: set[str]) -> list[dict]:
 					continue
 				if row["image_id"] in training_frames:
 					continue
-				if row["status"] != "empty" and row["boundary_contact"] == "":
+				if row["status"] != EMPTY and row["boundary_contact"] == "":
 					continue
 				pool.append(row)
 	return pool
 
 
 def spread_key(row: dict) -> str:
-	if row["status"] == "growing":
+	if row["status"] == GROWING:
 		contact = float(row["boundary_contact"])
 		return str(next(k for k in range(len(GROWING_BINS) - 1) if GROWING_BINS[k] <= contact < GROWING_BINS[k + 1]))
 	return row["captured_at"][:10]
@@ -103,13 +104,13 @@ def pick_items(pool: list[dict], rng: random.Random) -> tuple[list[dict], dict]:
 		if r["camera_id"] == EARLY_CAMERA
 		and r["captured_at"] >= EARLY_FROM
 		and r["captured_at"][:10] in EARLY_DAYS
-		and r["status"] in ("ready", "growing")
+		and r["status"] in (READY, GROWING)
 	]
 	n_early = defaultdict(int)
 	for row in round_robin(early, lambda r: r["row"]):  # spread over the board's rows
 		if n_early[row["status"]] < EARLY_QUOTAS[row["status"]] and take(row):
 			n_early[row["status"]] += 1
-	order = {"candidate": 0, "empty": 1, "ready": 2, "growing": 3}  # scarce statuses first (they share hole-days)
+	order = {CANDIDATE: 0, EMPTY: 1, READY: 2, GROWING: 3}  # scarce statuses first (they share hole-days)
 	for key in sorted(by_stratum, key=lambda k: (k[0], order[k[1]])):
 		for row in round_robin(by_stratum[key], spread_key):
 			if count[key] >= QUOTAS[key[1]]:
