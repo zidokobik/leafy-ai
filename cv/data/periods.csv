@@ -1,0 +1,20 @@
+camera_id,period,start,end,frames,usable_frames,started_by,note
+level1_camera1,P1,2026-09-15T10:00:24,2026-09-20T08:00:18,63,59,first frame,first frame
+level1_camera1,P2,2026-09-22T13:00:29,2026-09-30T10:00:26,96,88,camera_moved,"20-22 Sep layout change; the camera was also shifted ~20 px (fixed parts, checked by eye 5 Oct)"
+level1_camera1,P3,2026-09-30T11:00:23,2026-10-08T05:00:37,115,107,scene_changed,"30 Sep transfer: canopy to Level 2, Level 1 rearranged; camera not moved. Hole map level1_camera1_P3 (DRAFT) Extended 11 Oct to 8 Oct 05:00 (camera 1 moved ~17 px by 8 Oct 06:00)."
+level1_camera1,P4,2026-10-08T06:00:27,2026-10-08T14:00:19,9,9,camera_moved,"Camera 1 moved ~17 px (fixed parts, 81 inliers) between 8 Oct 05:00 and 06:00. Same plants. No hole map (out of scope)."
+level1_camera1,P5,2026-10-08T15:00:39,2026-10-08T18:15:24,5,5,scene_changed,8 Oct rearrangement (under way at 15:00). No hole map (out of scope).
+level1_camera2,P1,2026-09-15T10:00:25,2026-09-20T08:00:19,63,62,first frame,first frame
+level1_camera2,P2,2026-09-22T13:00:30,2026-09-30T10:00:27,96,95,scene_changed,20-22 Sep layout change. Hole map level1_camera2_P2 (pending review)
+level1_camera2,P3,2026-09-30T11:00:24,2026-10-08T15:00:41,125,112,scene_changed,"30 Sep transfer; camera 2 was also physically moved. Hole map level1_camera2_P3 (DRAFT) Extended 11 Oct to 8 Oct 15:00 (rearrangement under way at 15:00, unusable). Index corrected by hand 11 Oct (laptop rebuild + by-eye checks; HANDOVER 5.3). The rebuild split it at 4 false morning frames (5-8 Oct 05:00) and 7 Oct 17:00: same layout, < 2 px overnight; those frames set unusable."
+level1_camera2,P4,2026-10-08T16:00:28,2026-10-08T18:15:25,4,4,scene_changed,8 Oct rearrangement: new layout from 16:00. No hole map (out of scope). Index corrected by hand 11 Oct (laptop rebuild + by-eye checks; HANDOVER 5.3).
+level1_camera3,P1,2026-09-15T10:00:26,2026-09-18T16:00:17,41,40,first frame,first frame
+level1_camera3,P2,2026-09-18T17:00:23,2026-09-20T08:00:20,22,22,camera_moved,camera bumped ~22 px on 18 Sep (checked by eye)
+level1_camera3,P3,2026-09-22T13:00:31,2026-09-30T10:00:28,96,96,scene_changed,20-22 Sep layout change
+level1_camera3,P4,2026-09-30T11:00:26,2026-10-08T14:00:21,124,123,scene_changed,30 Sep transfer; camera not moved. Hole map level1_camera3_P4 (DRAFT) Extended 11 Oct to 8 Oct 14:00. Index corrected by hand 11 Oct (laptop rebuild + by-eye checks; HANDOVER 5.3).
+level1_camera3,P5,2026-10-08T15:00:42,2026-10-08T18:15:27,5,5,scene_changed,8 Oct rearrangement (under way at 15:00): the rebuild missed it; set by eye 11 Oct. No hole map (out of scope).
+level2_camera2,P1,2026-09-29T18:15:19,2026-09-30T10:00:30,7,7,first frame,empty board
+level2_camera2,P2,2026-09-30T11:00:27,2026-10-07T16:00:30,111,110,scene_changed,"30 Sep: plants arrived from Level 1 Extended 11 Oct to 7 Oct 16:00. 5 Oct 14:00 is a black-and-white night-mode frame (transient_shift, unusable)."
+level2_camera2,P3,2026-10-07T17:00:36,2026-10-07T18:00:36,2,2,scene_changed,7 Oct ~17:00 harvest under way (about 7 days after the 30 Sep transfer).
+level2_camera2,P4,2026-10-07T18:15:36,2026-10-08T15:00:44,12,11,scene_changed,7 Oct 18:15: after the harvest.
+level2_camera2,P5,2026-10-08T16:00:30,2026-10-08T18:15:28,4,4,scene_changed,8 Oct 16:00: Level 2 refilled.

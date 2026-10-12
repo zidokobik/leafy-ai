@@ -1,0 +1,457 @@
+{
+  "camera_id": "level1_camera2",
+  "level": 1,
+  "period": "P2",
+  "valid_from": "2026-09-22T13:00:30",
+  "valid_to": "2026-09-30T10:00:27",
+  "image_size": [
+    704,
+    576
+  ],
+  "reference_file": "level1_camera2_20260922_130030.jpg",
+  "holes": [
+    {
+      "hole_id": "L1-C2-R01-H01",
+      "x": 67.3,
+      "y": 125.3,
+      "row": 1,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H02",
+      "x": 120.0,
+      "y": 105.3,
+      "row": 1,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H03",
+      "x": 190.0,
+      "y": 94.0,
+      "row": 1,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H04",
+      "x": 256.7,
+      "y": 82.7,
+      "row": 1,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H05",
+      "x": 342.0,
+      "y": 80.0,
+      "row": 1,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H06",
+      "x": 409.3,
+      "y": 76.0,
+      "row": 1,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H07",
+      "x": 489.3,
+      "y": 79.3,
+      "row": 1,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H08",
+      "x": 562.0,
+      "y": 84.7,
+      "row": 1,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H09",
+      "x": 612.7,
+      "y": 93.3,
+      "row": 1,
+      "col": 9,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H01",
+      "x": 44.0,
+      "y": 166.0,
+      "row": 2,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H02",
+      "x": 96.0,
+      "y": 156.0,
+      "row": 2,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H03",
+      "x": 164.0,
+      "y": 144.0,
+      "row": 2,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H04",
+      "x": 240.0,
+      "y": 134.0,
+      "row": 2,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H05",
+      "x": 330.0,
+      "y": 126.0,
+      "row": 2,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H06",
+      "x": 420.0,
+      "y": 126.0,
+      "row": 2,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H07",
+      "x": 502.0,
+      "y": 130.0,
+      "row": 2,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H08",
+      "x": 572.0,
+      "y": 136.0,
+      "row": 2,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H09",
+      "x": 626.0,
+      "y": 142.0,
+      "row": 2,
+      "col": 9,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H01",
+      "x": 44.0,
+      "y": 220.0,
+      "row": 3,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H02",
+      "x": 114.0,
+      "y": 208.0,
+      "row": 3,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H03",
+      "x": 196.0,
+      "y": 198.0,
+      "row": 3,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H04",
+      "x": 294.0,
+      "y": 190.0,
+      "row": 3,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H05",
+      "x": 400.0,
+      "y": 186.0,
+      "row": 3,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H06",
+      "x": 494.0,
+      "y": 186.0,
+      "row": 3,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H07",
+      "x": 576.0,
+      "y": 190.0,
+      "row": 3,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H08",
+      "x": 638.0,
+      "y": 194.0,
+      "row": 3,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H01",
+      "x": 42.0,
+      "y": 284.0,
+      "row": 4,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H02",
+      "x": 114.0,
+      "y": 278.0,
+      "row": 4,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H03",
+      "x": 208.0,
+      "y": 274.0,
+      "row": 4,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H04",
+      "x": 329.3,
+      "y": 271.3,
+      "row": 4,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H05",
+      "x": 448.0,
+      "y": 262.0,
+      "row": 4,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H06",
+      "x": 548.0,
+      "y": 260.0,
+      "row": 4,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H07",
+      "x": 636.0,
+      "y": 262.0,
+      "row": 4,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H08",
+      "x": 688.0,
+      "y": 256.0,
+      "row": 4,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H01",
+      "x": 74.7,
+      "y": 377.3,
+      "row": 5,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H02",
+      "x": 180.0,
+      "y": 385.3,
+      "row": 5,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H03",
+      "x": 321.3,
+      "y": 384.0,
+      "row": 5,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H04",
+      "x": 471.3,
+      "y": 380.0,
+      "row": 5,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H05",
+      "x": 581.3,
+      "y": 368.7,
+      "row": 5,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H06",
+      "x": 672.7,
+      "y": 352.7,
+      "row": 5,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H01",
+      "x": 44.0,
+      "y": 528.0,
+      "row": 6,
+      "col": 1,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R06-H02",
+      "x": 160.0,
+      "y": 552.0,
+      "row": 6,
+      "col": 2,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R06-H03",
+      "x": 312.0,
+      "y": 566.0,
+      "row": 6,
+      "col": 3,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R06-H04",
+      "x": 476.0,
+      "y": 532.0,
+      "row": 6,
+      "col": 4,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R06-H05",
+      "x": 611.0,
+      "y": 516.0,
+      "row": 6,
+      "col": 5,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R06-H06",
+      "x": 697.0,
+      "y": 470.0,
+      "row": 6,
+      "col": 6,
+      "estimated": true
+    }
+  ],
+  "board_polygon": null,
+  "notes": "Clicked by Pearl on 30 Sep; rows regrouped by Claude (positions unchanged). PENDING TEAMMATE REVIEW. Rows are numbered by distance from camera 2: row 1 is the farthest mapped row, row 6 the nearest. Row 1 = the first row of the dense canopy (plant bases). Rows 2-4 = visible holes. Row 5 = plants, dots on the plant middles (review: move to pot bases?). Row 6 = nearest row, stem bases estimated; mostly outside the frame, so the tools leave most of it out of decisions automatically. The canopy rows beyond row 1 have no dots: zone 'canopy_far' covers them. valid_to is the last frame before the 30 Sep 11:00 camera move (fixed by Claude 7 Oct; it used to include the 11:00 frame, which belongs to P3).",
+  "zones": [
+    {
+      "name": "canopy_far",
+      "polygon": [
+        [
+          40,
+          130
+        ],
+        [
+          67,
+          125
+        ],
+        [
+          120,
+          105
+        ],
+        [
+          190,
+          94
+        ],
+        [
+          257,
+          83
+        ],
+        [
+          342,
+          80
+        ],
+        [
+          409,
+          76
+        ],
+        [
+          489,
+          79
+        ],
+        [
+          562,
+          85
+        ],
+        [
+          613,
+          93
+        ],
+        [
+          640,
+          112
+        ],
+        [
+          632,
+          40
+        ],
+        [
+          592,
+          0
+        ],
+        [
+          90,
+          0
+        ],
+        [
+          58,
+          50
+        ],
+        [
+          40,
+          95
+        ]
+      ],
+      "kind": "canopy",
+      "note": "The dense canopy from the row-1 plant bases to the top of the frame: row 1's plants plus the rows beyond them, whose bases can't be seen. Measured as closure (share covered by leaves). Overlaps row-1 cells by design."
+    }
+  ]
+}

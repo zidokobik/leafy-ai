@@ -1,0 +1,7 @@
+{
+	"_about": "Rectangles [x0, y0, x1, y1] in each camera's view that never change: frame rails, walls, the light bar. The camera-movement check matches only these, so growing leaves can't fake a move. Checked on 5 Oct against known moves. Camera 3's top band starts at x=420 because the 30 Sep canopy grew into it further left. If a camera is turned and these no longer cover fixed parts, redraw them.",
+	"level1_camera1": [[0, 40, 90, 140], [650, 40, 704, 230]],
+	"level1_camera2": [[0, 40, 60, 160], [620, 40, 704, 140]],
+	"level1_camera3": [[420, 0, 704, 110], [0, 0, 60, 300]],
+	"level2_camera2": [[0, 0, 704, 85], [0, 85, 80, 560]]
+}

@@ -1,0 +1,497 @@
+{
+  "camera_id": "level1_camera2",
+  "level": 1,
+  "period": "P3",
+  "valid_from": "2026-09-30T11:00:24",
+  "valid_to": null,
+  "image_size": [
+    704,
+    576
+  ],
+  "reference_file": "level1_camera2_20260930_110024.jpg",
+  "holes": [
+    {
+      "hole_id": "L1-C2-R01-H01",
+      "x": 102.0,
+      "y": 57.3,
+      "row": 1,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H02",
+      "x": 146.7,
+      "y": 47.3,
+      "row": 1,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H03",
+      "x": 203.3,
+      "y": 33.3,
+      "row": 1,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H04",
+      "x": 256.0,
+      "y": 27.3,
+      "row": 1,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H05",
+      "x": 320.0,
+      "y": 22.0,
+      "row": 1,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H06",
+      "x": 388.0,
+      "y": 20.7,
+      "row": 1,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H07",
+      "x": 452.0,
+      "y": 24.0,
+      "row": 1,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H08",
+      "x": 500.0,
+      "y": 25.3,
+      "row": 1,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R01-H09",
+      "x": 554.0,
+      "y": 34.0,
+      "row": 1,
+      "col": 9,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H01",
+      "x": 112.0,
+      "y": 82.7,
+      "row": 2,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H02",
+      "x": 170.7,
+      "y": 64.7,
+      "row": 2,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H03",
+      "x": 235.3,
+      "y": 57.3,
+      "row": 2,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H04",
+      "x": 314.0,
+      "y": 52.7,
+      "row": 2,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H05",
+      "x": 392.7,
+      "y": 46.0,
+      "row": 2,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H06",
+      "x": 456.7,
+      "y": 50.7,
+      "row": 2,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H07",
+      "x": 507.3,
+      "y": 51.3,
+      "row": 2,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R02-H08",
+      "x": 560.7,
+      "y": 57.3,
+      "row": 2,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H01",
+      "x": 78.0,
+      "y": 123.3,
+      "row": 3,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H02",
+      "x": 148.0,
+      "y": 108.0,
+      "row": 3,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H03",
+      "x": 220.0,
+      "y": 96.0,
+      "row": 3,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H04",
+      "x": 320.7,
+      "y": 86.0,
+      "row": 3,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H05",
+      "x": 405.3,
+      "y": 80.7,
+      "row": 3,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H06",
+      "x": 476.0,
+      "y": 84.7,
+      "row": 3,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H07",
+      "x": 542.0,
+      "y": 88.0,
+      "row": 3,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R03-H08",
+      "x": 597.3,
+      "y": 96.7,
+      "row": 3,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H01",
+      "x": 63.3,
+      "y": 151.3,
+      "row": 4,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H02",
+      "x": 136.7,
+      "y": 148.0,
+      "row": 4,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H03",
+      "x": 216.0,
+      "y": 131.3,
+      "row": 4,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H04",
+      "x": 322.0,
+      "y": 126.7,
+      "row": 4,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H05",
+      "x": 418.7,
+      "y": 127.3,
+      "row": 4,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H06",
+      "x": 512.0,
+      "y": 134.0,
+      "row": 4,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H07",
+      "x": 585.3,
+      "y": 132.7,
+      "row": 4,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R04-H08",
+      "x": 633.3,
+      "y": 131.3,
+      "row": 4,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H01",
+      "x": 30.0,
+      "y": 207.3,
+      "row": 5,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H02",
+      "x": 117.3,
+      "y": 206.0,
+      "row": 5,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H03",
+      "x": 202.0,
+      "y": 201.3,
+      "row": 5,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H04",
+      "x": 314.7,
+      "y": 198.0,
+      "row": 5,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H05",
+      "x": 428.7,
+      "y": 193.3,
+      "row": 5,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H06",
+      "x": 518.0,
+      "y": 190.0,
+      "row": 5,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H07",
+      "x": 591.3,
+      "y": 184.0,
+      "row": 5,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R05-H08",
+      "x": 642.0,
+      "y": 171.3,
+      "row": 5,
+      "col": 8,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H01",
+      "x": 16.0,
+      "y": 290.7,
+      "row": 6,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H02",
+      "x": 79.3,
+      "y": 288.0,
+      "row": 6,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H03",
+      "x": 178.7,
+      "y": 288.0,
+      "row": 6,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H04",
+      "x": 309.3,
+      "y": 283.3,
+      "row": 6,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H05",
+      "x": 426.7,
+      "y": 282.7,
+      "row": 6,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H06",
+      "x": 541.3,
+      "y": 279.3,
+      "row": 6,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R06-H07",
+      "x": 634.7,
+      "y": 274.0,
+      "row": 6,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R07-H01",
+      "x": 14.0,
+      "y": 368.0,
+      "row": 7,
+      "col": 1,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R07-H02",
+      "x": 69.3,
+      "y": 378.0,
+      "row": 7,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R07-H03",
+      "x": 173.3,
+      "y": 392.0,
+      "row": 7,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R07-H04",
+      "x": 308.0,
+      "y": 390.7,
+      "row": 7,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R07-H05",
+      "x": 454.0,
+      "y": 380.0,
+      "row": 7,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R07-H06",
+      "x": 579.3,
+      "y": 370.0,
+      "row": 7,
+      "col": 6,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R07-H07",
+      "x": 662.7,
+      "y": 348.0,
+      "row": 7,
+      "col": 7,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R08-H01",
+      "x": 47.3,
+      "y": 502.7,
+      "row": 8,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R08-H02",
+      "x": 175.0,
+      "y": 555.0,
+      "row": 8,
+      "col": 2,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C2-R08-H03",
+      "x": 330.0,
+      "y": 545.0,
+      "row": 8,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R08-H04",
+      "x": 484.0,
+      "y": 512.7,
+      "row": 8,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C2-R08-H05",
+      "x": 616.0,
+      "y": 496.7,
+      "row": 8,
+      "col": 5,
+      "estimated": false
+    }
+  ],
+  "board_polygon": null,
+  "notes": "Drafted by Claude 5 Oct; re-clicked by Pearl 7 Oct (54 new dots, incl. the far rows the draft skipped). Her dots all landed in row 1 (the tool then added clicks to the selected row), so Claude regrouped them into 8 rows on 7 Oct by the curve each row follows, without moving any dot; her saved file is in data/backup/level1_camera2_P3.clicked_7oct.json. Layout from 30 Sep 11:00 (camera 2 was moved then). Rows are channels, numbered by distance from camera 2: row 1 = the top-edge row (farthest), row 8 = nearest. Pearl then corrected it again on 7 Oct (added row 2 H06 at the plant below R01-H07, re-placed some row 1-3 dots); all 6 checks pass. Dots are plant bases.",
+  "zones": []
+}
