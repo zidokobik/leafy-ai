@@ -12,16 +12,21 @@ CREATE TABLE public.users (
   last_login_at timestamp with time zone,
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
+-- Kasa power strips on the farm network, reached by IP address or hostname.
+CREATE TABLE public.powerboards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL CHECK (length(trim(name)) > 0),
+  host text NOT NULL UNIQUE CHECK (length(trim(host)) > 0)
+);
+-- Equipment plugged into one powerboard outlet. outlet_num is 1-based (outlet 1 is the
+-- board's first socket). A powerboard cannot be deleted while devices still use it.
 CREATE TABLE public.devices (
-  device_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  device_name character varying,
-  device_category character varying,
-  device_type character varying,
-  level_id uuid,
-  measurement_unit text,
-  status character varying,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT devices_pkey PRIMARY KEY (device_id)
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL CHECK (length(trim(name)) > 0 AND length(name) <= 100),
+  device_type text NOT NULL CHECK (device_type IN ('fan', 'light', 'irrigation_pump', 'ec_doser', 'ph_doser')),
+  powerboard_id uuid NOT NULL REFERENCES public.powerboards(id) ON DELETE RESTRICT,
+  outlet_num integer NOT NULL CHECK (outlet_num >= 1),
+  CONSTRAINT devices_powerboard_outlet_unique UNIQUE (powerboard_id, outlet_num)
 );
 -- Latest synced image per camera. `id` is the tutor API's `camera_name` (e.g. level1_camera1);
 -- `image_url` points at the public Supabase Storage bucket the hourly sync uploads to.
@@ -100,52 +105,44 @@ CREATE TABLE public.agent_scheduled_job (
   CONSTRAINT agent_scheduled_job_pkey PRIMARY KEY (id)
 );
 
--- Safety rules and AI decision logging. Demo devices and rules are seed data,
--- not part of this schema. Approval does not trigger hardware execution yet.
-CREATE TABLE public.safety_rules (
-  rule_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  device_id uuid NOT NULL REFERENCES public.devices(device_id),
-  action_type text NOT NULL DEFAULT 'run_for_duration'
-    CHECK (action_type IN ('run_for_duration')),
-  max_duration_seconds integer NOT NULL CHECK (max_duration_seconds > 0),
-  cooldown_seconds integer NOT NULL DEFAULT 0 CHECK (cooldown_seconds >= 0),
-  enabled boolean NOT NULL DEFAULT true,
-  CONSTRAINT safety_rules_device_action_unique UNIQUE (device_id, action_type)
-);
-
-CREATE TABLE public.ai_decisions (
-  decision_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  summary text NOT NULL CHECK (length(trim(summary)) > 0),
-  recommendation text NOT NULL CHECK (length(trim(recommendation)) > 0),
-  schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL
-);
-
-CREATE TABLE public.command_requests (
-  request_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  decision_id uuid REFERENCES public.ai_decisions(decision_id),
-  device_id uuid NOT NULL REFERENCES public.devices(device_id),
-  action_type text NOT NULL DEFAULT 'run_for_duration'
-    CHECK (action_type IN ('run_for_duration')),
-  duration_seconds integer NOT NULL CHECK (duration_seconds > 0),
-  reason text NOT NULL CHECK (length(trim(reason)) > 0),
-  status text NOT NULL DEFAULT 'pending_approval'
-    CHECK (status IN (
-      'pending_approval', 'blocked', 'approved', 'rejected', 'expired',
-      'executing', 'succeeded', 'failed', 'unknown'
-    )),
-  reviewed_by uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
-  reviewed_at timestamptz,
+-- Agent proposals to switch a device on for a set time. A person approves (the outlet
+-- switches on and an in-process timer switches it off at ends_at) or rejects it;
+-- unreviewed proposals expire at expires_at. powerboard_host/outlet_num snapshot the
+-- outlet that was switched on so the switch-off still targets it if the device is
+-- edited or deleted. device_name keeps the name for the log after a device is deleted.
+-- status: pending -> rejected | expired | failed (could not switch on) | running;
+-- running -> completed | stopped (switched off early by a person) | failed (could not
+-- switch off; a critical alert is raised).
+CREATE TABLE public.device_proposals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id uuid REFERENCES public.devices(id) ON DELETE SET NULL,
+  device_name text NOT NULL,
+  duration_seconds integer NOT NULL CHECK (duration_seconds BETWEEN 1 AND 86400),
+  reason text NOT NULL CHECK (length(trim(reason)) > 0 AND length(reason) <= 2000),
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'rejected', 'expired', 'running', 'completed', 'stopped', 'failed')),
+  schedule_id uuid REFERENCES public.agent_scheduled_job(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
+  reviewed_by uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
+  reviewed_at timestamptz,
+  powerboard_host text,
+  outlet_num integer,
   started_at timestamptz,
+  ends_at timestamptz,
   finished_at timestamptz,
   result_message text,
-  CONSTRAINT command_requests_expiry_check CHECK (expires_at > created_at),
-  CONSTRAINT command_requests_execution_time_check CHECK (
-    finished_at IS NULL OR (started_at IS NOT NULL AND finished_at >= started_at)
+  CONSTRAINT device_proposals_expiry_check CHECK (expires_at > created_at),
+  CONSTRAINT device_proposals_run_check CHECK (
+    (started_at IS NULL) = (ends_at IS NULL)
+    AND (started_at IS NULL OR (powerboard_host IS NOT NULL AND outlet_num IS NOT NULL))
+    AND (status <> 'running' OR started_at IS NOT NULL)
   )
 );
+-- One open (pending or running) proposal per device.
+CREATE UNIQUE INDEX device_proposals_open_device_unique
+  ON public.device_proposals (device_id) WHERE status IN ('pending', 'running');
+CREATE INDEX device_proposals_created_idx ON public.device_proposals (created_at DESC);
 
 -- Conversation history for the agent chat. Interactive chats are created by
 -- POST /api/v1/chat; scheduled agent runs store one conversation per execution

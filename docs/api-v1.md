@@ -181,6 +181,104 @@ the agent's `send_email` tool and `"user"` for test emails from the Alerts page.
 records the scheduled run that triggered the send (`null` for interactive chat sends, test emails,
 or deleted schedules).
 
+## Devices and powerboards
+
+A powerboard is a Kasa power strip on the server's network, reached by IP address or hostname. A
+device is one piece of equipment plugged into one of its outlets. `outletNum` is 1-based: outlet 1
+is the board's first socket. The server talks to the boards with `python-kasa`
+(`backend/services/outlets.py`): every command discovers the board by host, switches or reads its
+outlets, and disconnects. Boards whose firmware requires a TP-Link account login need
+`KASA_USERNAME` and `KASA_PASSWORD` in `.env`. All endpoints require a session cookie.
+
+| Method   | Path                                  | Behavior                                                                                               |
+| -------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/powerboards`                 | List powerboards ordered by name                                                                       |
+| `POST`   | `/api/v1/powerboards`                 | Add a powerboard (`{ "name": "...", "host": "192.168.1.101" }`); a duplicate host returns `409`        |
+| `PUT`    | `/api/v1/powerboards/{id}`            | Replace a powerboard's name and host                                                                   |
+| `DELETE` | `/api/v1/powerboards/{id}`            | Delete a powerboard; `409` while devices still use it                                                  |
+| `GET`    | `/api/v1/powerboards/states`          | Read every board's outlets live, concurrently. Can take several seconds when a board is unreachable    |
+| `GET`    | `/api/v1/devices`                     | List devices ordered by powerboard name, then outlet                                                   |
+| `POST`   | `/api/v1/devices`                     | Add a device; unknown powerboards return `404`, an outlet already assigned on that board returns `409` |
+| `PUT`    | `/api/v1/devices/{id}`                | Replace a device's fields                                                                              |
+| `DELETE` | `/api/v1/devices/{id}`                | Delete a device and reject its pending proposal. A run in progress still switches off on time          |
+| `POST`   | `/api/v1/devices/{id}/turn-on`        | Switch the device on now; it stays on until switched off. `204` on success, `502` if the board fails   |
+| `POST`   | `/api/v1/devices/{id}/turn-off`       | Switch the device off now, stopping its run in progress. `204` on success, `502` if the board fails    |
+
+`host` is an IP address or hostname only, without a scheme or port. A device body looks like
+`{ "name": "Circulation fan", "deviceType": "fan", "powerboardId": "<uuid>", "outletNum": 2 }`,
+where `deviceType` is `fan`, `light`, `irrigation_pump`, `ec_doser`, or `ph_doser`.
+
+`/powerboards/states` returns one entry per board. `outlets` lists each outlet's on/off state in
+outlet order; when a board cannot be reached it is `null` and `error` explains why:
+
+```json
+[
+  { "powerboardId": "805c6ce5-2b77-4fcb-8d85-c38be7b105b7", "outlets": [false, true, false], "error": null },
+  {
+    "powerboardId": "3eea9439-3fd4-4849-ae14-ebe07888a59b",
+    "outlets": null,
+    "error": "Powerboard 192.168.1.101 did not respond. Check it is powered on and on the same network as the server."
+  }
+]
+```
+
+`turn-on` and `turn-off` are for people on the Devices page; the agent has no tool for them. A
+successful response means the board confirmed the new state. Switching off a device with a run in
+progress marks that proposal `stopped`, so the log shows who ended it. Switching on is not timed:
+the device stays on until someone switches it off (or an approved run for it ends).
+
+## Device proposals
+
+The agent cannot switch devices. Its `propose_device_run` tool (chat and scheduled runs) records a
+pending proposal to switch one device on for `durationSeconds` (1 to 86400) with a `reason` for the
+reviewer; `list_devices` and `list_device_proposals` let it check device states and earlier
+outcomes first. A device can have only one pending or running proposal. Proposals that are not
+reviewed within 30 minutes expire. Overview shows pending and running proposals after the alerts;
+the Logs page lists all of them. All endpoints require a session cookie.
+
+| Method | Path                                    | Behavior                                                                                                                       |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GET`  | `/api/v1/proposals`                     | Proposals, newest first. Repeat `status` to filter (`?status=pending&status=running`); supports `limit` (1-100, default 50) and `offset` |
+| `POST` | `/api/v1/proposals/{id}/approve`        | Approve a pending proposal and switch the outlet on now. If the powerboard fails, the proposal is returned with status `failed` |
+| `POST` | `/api/v1/proposals/{id}/reject`         | Reject a pending proposal                                                                                                      |
+| `POST` | `/api/v1/proposals/{id}/stop`           | Switch a running device off early. `502` when the powerboard cannot be reached (the run keeps its automatic switch-off)        |
+
+Approving, rejecting or stopping a proposal that is no longer in the right state returns `409`;
+unknown ids return `404`. The reviewer is always the signed-in user.
+
+```json
+{
+  "id": "5f1c2a8e-0d3b-4a51-9f3e-2b7c9a1d4e60",
+  "deviceId": "0c7a3e52-91b4-4a8e-8d0f-6c2e3b9a7f14",
+  "deviceName": "Circulation fan",
+  "durationSeconds": 600,
+  "reason": "Humidity has been above 85% for two hours.",
+  "status": "running",
+  "scheduleId": null,
+  "createdAt": "2026-10-13T01:00:00Z",
+  "expiresAt": "2026-10-13T01:30:00Z",
+  "reviewedBy": "2a9f6b0e-5d1c-4e7a-8b3f-9c0d1e2f3a4b",
+  "reviewerEmail": "grower@example.com",
+  "reviewedAt": "2026-10-13T01:05:00Z",
+  "startedAt": "2026-10-13T01:05:00Z",
+  "endsAt": "2026-10-13T01:15:00Z",
+  "finishedAt": null,
+  "resultMessage": null
+}
+```
+
+`status` moves from `pending` to `rejected`, `expired`, `failed` (the outlet could not be switched
+on), or `running`. A running proposal ends as `completed` (switched off automatically at `endsAt`),
+`stopped` (switched off early by a user), or `failed` when the automatic switch-off still fails
+after five attempts 30 seconds apart; that also raises a critical `device_stuck_on_*` alert because
+the device may still be on. `resultMessage` explains failures. `deviceId` becomes `null` if the
+device is later deleted; `deviceName` keeps its name. `scheduleId` is set when a scheduled agent
+run made the proposal.
+
+The switch-off timer runs inside the API process and is re-armed on startup, so a run that ended
+while the API was down is switched off as soon as it starts again. Durations are approximate to
+within a couple of seconds, since every switch reconnects to the powerboard.
+
 ## Scheduled agent jobs
 
 Scheduled agent jobs require a session cookie and persist a title, agent instruction, and standard

@@ -32,7 +32,7 @@ Routers stay thin: they wire up dependencies and shape responses. The work itsel
 
 The "frontend" refers to the React + TypeScript code in `frontend/`. It was previously managed separately in a different repository, but has been merged into this repository for easier development and deployment. Any changes should `cd` into the `frontend/` directory and run the frontend development server from there.
 
-The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Agents, Schedules and Devices. Overview charts sensor history for a requested `before` to `end` interval using `recharts` through shadcn chart components, and a floating "Ask agent" button opens the same agent chat in a right-side sheet. Agents provides chat, and Schedules lists, creates and deletes recurring agent jobs. Devices is currently a placeholder.
+The dashboard uses client-side routing (`react-router-dom`) with one page per sidebar entry: Overview, Alerts, Agents, Schedules, Devices and Logs. Overview shows active alerts and the device proposals awaiting review, charts sensor history for a requested `before` to `end` interval using `recharts` through shadcn chart components, and a floating "Ask agent" button opens the same agent chat in a right-side sheet. Agents provides chat, and Schedules lists, creates and deletes recurring agent jobs. Devices manages the Kasa powerboards and the devices plugged into their outlets, and lets people switch devices on or off by hand. The agent can only propose switching a device on for a set time; a person approves each run on Overview or Logs, and the device switches off by itself when the run ends. Logs lists every proposal with its review and outcome.
 
 The frontend UI is built with shadcn/ui source components, Tailwind CSS v4, and a basil-green theme defined in `frontend/src/styles/base.css`. Shared primitives live in `frontend/src/components/ui/`; compose those before adding custom markup or feature-local CSS.
 
@@ -76,6 +76,7 @@ Edit the `.env` file to set the environment variables as needed, some examples i
 - `AI_MODEL`: the model to use as the agent. See (https://vercel.com/ai-gateway/models) for available models. The model must have vision and tool-calling capabilities.
 - `DATABASE_URI`: an `asyncpg` connection string for the Postgres database (a Supabase-hosted Postgres database works fine; only its database connection is used, not its Auth/BaaS features).
 - `JWT_SECRET_KEY`: a random secret used to sign session tokens. Generate one with `openssl rand -hex 32`.
+- `KASA_USERNAME` / `KASA_PASSWORD` (optional): a TP-Link account login, only needed for powerboards whose firmware requires authentication. The server must be on the same network as the powerboards.
 
 ### Run the development servers
 

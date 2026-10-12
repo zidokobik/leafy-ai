@@ -1,19 +1,20 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import { safetyApi } from "@/api/safety";
-import { safetyError, useSafetyList } from "../safety/useSafetyList";
+import React, { useState, useMemo } from "react";
+import type { ProposalStatus } from "@/api/proposals";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Droplets,
-  Sun,
-  Camera,
-  Sprout,
+  PlugZap,
   AlertTriangle,
   CheckCircle2,
   Clock,
   ChevronDown,
   Search,
 } from "lucide-react";
+import { ProposalActionButtons, ProposalConfirmDialog } from "../proposals/ProposalActions";
+import { formatDuration, isExpired, proposalStatusMeta } from "../proposals/proposalMeta";
+import { useNow } from "../proposals/useNow";
+import { useProposalActions } from "../proposals/useProposalActions";
+import { useProposals } from "../proposals/useProposals";
 
 type LogLevel = "alert" | "action" | "info";
 
@@ -41,81 +42,59 @@ const LEVEL_STYLES: Record<
   },
 };
 
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  Irrigation: Droplets,
-  Dosing: Droplets,
-  Lighting: Sun,
-  Monitoring: Camera,
-  Spacing: Camera,
-  Harvest: Sprout,
-};
+const FILTERS = ["All", "Awaiting review", "Actions", "Failed"];
 
-const FILTERS = ["All", "Actions", "Alerts"];
+const PAGE_SIZE = 20;
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" });
+}
+
+function levelOf(status: ProposalStatus): LogLevel {
+  if (status === "failed") return "alert";
+  if (status === "running" || status === "completed" || status === "stopped") return "action";
+  return "info";
+}
 
 export function LogsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
 
-  const logs = useSafetyList(safetyApi.commands);
-  const [now, setNow] = useState(() => Date.now());
-  const [busy, setBusy] = useState(false);
-  const inFlight = useRef(false);
-  const [actionError, setActionError] = useState("");
-  const [feedback, setFeedback] = useState("");
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  const entries = useMemo(() => logs.items.map((request) => {
-    const expired = !request.startedAt && ["pending_approval", "approved"].includes(request.status) && Date.parse(request.expiresAt) <= now;
-    const status = expired ? "expired" : request.status;
+  const logs = useProposals({ limit: PAGE_SIZE, offset });
+  const actions = useProposalActions(logs.refresh);
+  const now = useNow();
+  const entries = useMemo(() => logs.proposals.map((proposal) => {
+    const status: ProposalStatus = isExpired(proposal, now) ? "expired" : proposal.status;
     return {
-      id: request.requestId,
-      timestamp: new Date(request.createdAt).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" }),
-      level: (["blocked", "failed", "unknown"].includes(status) ? "alert" : "action") as LogLevel,
-      category: "Device operation",
-      title: `Run device for ${request.durationSeconds} seconds`,
-      reasoning: request.reason,
-      status: status === "pending_approval" ? "Pending review" : status.replaceAll("_", " "),
-      sensor: null,
-      request,
-      expired,
+      id: proposal.id,
+      timestamp: formatTime(proposal.createdAt),
+      level: levelOf(status),
+      category: proposal.scheduleId ? "Agent proposal · scheduled run" : "Agent proposal",
+      title: `Switch on ${proposal.deviceName} for ${formatDuration(proposal.durationSeconds)}`,
+      reasoning: proposal.reason,
+      statusKey: status,
+      status: proposalStatusMeta[status].label,
+      proposal,
     };
-  }), [logs.items, now]);
-
-  async function reviewRequest(id: string, action: "approve" | "reject") {
-    if (inFlight.current) return;
-    const request = logs.items.find((item) => item.requestId === id);
-    if (!request || request.status !== "pending_approval" || Date.parse(request.expiresAt) <= now) return;
-    if (!window.confirm(`${action === "approve" ? "Approve" : "Reject"} this operation? Approval does not execute hardware.`)) return;
-    inFlight.current = true;
-    setBusy(true); setActionError(""); setFeedback("");
-    try {
-      const result = await safetyApi.review(id, action);
-      setFeedback(`Request ${result.status.replaceAll("_", " ")}. ${result.resultMessage ?? ""}`);
-    } catch (error) {
-      setActionError(`${safetyError(error)} Check the refreshed record before retrying.`);
-    } finally {
-      inFlight.current = false; setBusy(false); logs.refresh();
-    }
-  }
+  }), [logs.proposals, now]);
 
   const filtered = useMemo(() => {
     return entries.filter((entry) => {
       const matchesFilter =
         activeFilter === "All" ||
+        (activeFilter === "Awaiting review" && entry.statusKey === "pending") ||
         (activeFilter === "Actions" && entry.level === "action") ||
-        (activeFilter === "Alerts" && entry.level === "alert") ||
-        (activeFilter === "Info" && entry.level === "info");
+        (activeFilter === "Failed" && entry.level === "alert");
 
       const q = query.trim().toLowerCase();
       const matchesQuery =
         q === "" ||
         entry.title.toLowerCase().includes(q) ||
         entry.category.toLowerCase().includes(q) ||
-        entry.request.deviceId.toLowerCase().includes(q) ||
-        entry.reasoning.toLowerCase().includes(q);
+        entry.reasoning.toLowerCase().includes(q) ||
+        (entry.proposal.resultMessage ?? "").toLowerCase().includes(q);
 
       return matchesFilter && matchesQuery;
     });
@@ -123,9 +102,9 @@ export function LogsPage() {
 
   const counts = useMemo(
     () => ({
-      alerts: entries.filter((e) => e.level === "alert").length,
-      pending: entries.filter((e) => e.status === "Pending review").length,
-      autoApplied: entries.filter((e) => e.status === "approved").length,
+      pending: entries.filter((e) => e.statusKey === "pending").length,
+      running: entries.filter((e) => e.statusKey === "running").length,
+      failed: entries.filter((e) => e.statusKey === "failed").length,
     }),
     [entries],
   );
@@ -141,23 +120,17 @@ export function LogsPage() {
           Action log & reasoning
         </h1>
         <p className="text-gray-500 text-base max-w-2xl">
-          Stored operation requests, safety outcomes, and human reviews.
-          Hardware execution is not connected. Times are Melbourne time.
+          Device runs proposed by the agent, how each was reviewed, and how
+          each run ended. Times are Melbourne time.
         </p>
       </div>
 
-      {(logs.error || actionError) && <Alert variant="destructive"><AlertDescription>{actionError || logs.error}</AlertDescription></Alert>}
-      {feedback && <Alert role="status"><AlertDescription>{feedback}</AlertDescription></Alert>}
-      <div className="mb-4 flex items-center gap-3"><Button variant="outline" disabled={busy || logs.status === "loading"} onClick={logs.refresh}>Refresh logs</Button><p className="text-sm text-muted-foreground">Counts, search and filters apply to this page of operation requests.</p></div>
+      {(logs.error || actions.error) && <Alert variant="destructive"><AlertDescription>{actions.error || logs.error}</AlertDescription></Alert>}
+      {actions.notice && <Alert role="status"><AlertDescription>{actions.notice}</AlertDescription></Alert>}
+      <div className="mb-4 flex items-center gap-3"><Button variant="outline" disabled={actions.busy || logs.status === "loading"} onClick={logs.refresh}>Refresh logs</Button><p className="text-sm text-muted-foreground">Counts, search and filters apply to this page of proposals.</p></div>
       {logs.status === "loading" && <p role="status">Loading logs...</p>}
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
-          <div className="font-mono text-2xl font-medium text-red-500">
-            {counts.alerts}
-          </div>
-          <div className="text-sm text-gray-500 mt-1">Blocked / failed requests</div>
-        </div>
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
           <div className="font-mono text-2xl font-medium text-amber-500">
             {counts.pending}
@@ -166,9 +139,15 @@ export function LogsPage() {
         </div>
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
           <div className="font-mono text-2xl font-medium text-emerald-500">
-            {counts.autoApplied}
+            {counts.running}
           </div>
-          <div className="text-sm text-gray-500 mt-1">Approved, not executed</div>
+          <div className="text-sm text-gray-500 mt-1">Running now</div>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm">
+          <div className="font-mono text-2xl font-medium text-red-500">
+            {counts.failed}
+          </div>
+          <div className="text-sm text-gray-500 mt-1">Failed</div>
         </div>
       </div>
 
@@ -195,7 +174,7 @@ export function LogsPage() {
 
           <input
             type="text"
-            placeholder=" Search actions, categories, reasoning…"
+            placeholder=" Search devices, reasoning, results…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1 w-full bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder:text-gray-400"
@@ -203,20 +182,20 @@ export function LogsPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-3"><Button variant="outline" disabled={busy || logs.status === "loading" || logs.offset === 0} onClick={() => logs.page(logs.offset - 20)}>Previous</Button><span>Page {logs.offset / 20 + 1}</span><Button variant="outline" disabled={busy || logs.status !== "ready" || logs.items.length < 20} onClick={() => logs.page(logs.offset + 20)}>Next</Button></div>
+      <div className="mb-4 flex items-center gap-3"><Button variant="outline" disabled={actions.busy || logs.status === "loading" || offset === 0} onClick={() => setOffset(offset - PAGE_SIZE)}>Previous</Button><span>Page {offset / PAGE_SIZE + 1}</span><Button variant="outline" disabled={actions.busy || logs.status !== "ready" || logs.proposals.length < PAGE_SIZE} onClick={() => setOffset(offset + PAGE_SIZE)}>Next</Button></div>
       {/* Log Entries */}
       <div className="flex flex-col gap-3">
-        {logs.status === "ready" && filtered.length === 0 && (
+        {logs.status !== "loading" && filtered.length === 0 && (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
-            No log entries match that search or filter.
+            {entries.length === 0 ? "No device proposals yet." : "No log entries match that search or filter."}
           </div>
         )}
 
-        {logs.status === "ready" && filtered.map((entry) => {
-          const style = LEVEL_STYLES[entry.level as LogLevel];
-          const CategoryIcon = CATEGORY_ICONS[entry.category] || Sprout;
+        {logs.status !== "loading" && filtered.map((entry) => {
+          const style = LEVEL_STYLES[entry.level];
           const LevelIcon = style.Icon;
           const isOpen = expandedId === entry.id;
+          const { proposal } = entry;
 
           return (
             <div
@@ -231,7 +210,7 @@ export function LogsPage() {
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setExpandedId(isOpen ? null : entry.id); } }}
                 onClick={() => setExpandedId(isOpen ? null : entry.id)}
               >
-                <CategoryIcon className={`size-5 ${style.color}`} />
+                <PlugZap className={`size-5 ${style.color}`} />
 
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 dark:text-white truncate">
@@ -266,28 +245,30 @@ export function LogsPage() {
                     {entry.reasoning}
                   </p>
                   <div className="mb-3 flex flex-col gap-2 break-words text-sm text-muted-foreground">
-                    <p>Device UUID: {entry.request.deviceId}</p>
-                    <p>{entry.expired ? "Request expired before execution." : entry.request.resultMessage}</p>
-                    <p>Expires: {new Date(entry.request.expiresAt).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" })}</p>
-                    {entry.request.reviewedAt && <p>Reviewed: {new Date(entry.request.reviewedAt).toLocaleString("en-AU", { timeZone: "Australia/Melbourne", timeZoneName: "short" })}</p>}
-                    {entry.request.reviewedBy && <p>Reviewer UUID: {entry.request.reviewedBy}</p>}
+                    <p>Device: {proposal.deviceName}{proposal.deviceId === null && " (since deleted)"}</p>
+                    {proposal.resultMessage && <p>{proposal.resultMessage}</p>}
+                    {entry.statusKey === "pending" && <p>Review by: {formatTime(proposal.expiresAt)}</p>}
+                    {proposal.reviewedAt && <p>Reviewed: {formatTime(proposal.reviewedAt)}{proposal.reviewerEmail && ` by ${proposal.reviewerEmail}`}</p>}
+                    {proposal.startedAt && <p>Switched on: {formatTime(proposal.startedAt)}</p>}
+                    {proposal.status === "running" && proposal.endsAt && <p>Switches off: {formatTime(proposal.endsAt)}</p>}
+                    {proposal.finishedAt && <p>Finished: {formatTime(proposal.finishedAt)}</p>}
                   </div>
                   <div className="mb-3 flex gap-2">
-                    <Button disabled={busy || entry.status !== "Pending review"} onClick={() => void reviewRequest(entry.id, "approve")}>Approve</Button>
-                    <Button variant="outline" disabled={busy || entry.status !== "Pending review"} onClick={() => void reviewRequest(entry.id, "reject")}>Reject</Button>
+                    <ProposalActionButtons proposal={proposal} now={now} busy={actions.busy} onAction={actions.request} />
                   </div>
-
-                  {entry.sensor && (
-                    <div className="font-mono text-xs text-gray-500 bg-gray-50 dark:bg-gray-800/50 inline-flex px-2 py-1 rounded border border-gray-100 dark:border-gray-800">
-                      Sensor context: {entry.sensor}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+      <ProposalConfirmDialog
+        confirmation={actions.confirmation}
+        open={actions.confirmOpen}
+        busy={actions.busy}
+        onConfirm={actions.confirm}
+        onCancel={actions.cancel}
+      />
     </div>
   );
 }

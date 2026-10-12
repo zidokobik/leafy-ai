@@ -1,287 +1,396 @@
-import { useState } from "react";
+import { useState } from 'react'
 import {
-  Camera,
-  Droplets,
-  TestTube2,
-  Sun,
-  Wifi,
-  WifiOff,
-  AlertTriangle,
-  Video,
-  X,
-  Loader2,
-  Gauge,
-  ImageOff,
-} from "lucide-react";
-
-import type { CameraImage } from "@/api/contracts";
+  CircleAlertIcon,
+  PencilIcon,
+  PlugZapIcon,
+  PlusIcon,
+  PowerIcon,
+  RefreshCwIcon,
+  Trash2Icon,
+} from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  useFarmDevices,
-  type Device,
-  type DeviceType,
-  type DeviceStatus,
-} from "./useFarmDevice";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { errorDetail } from '../../api/client'
+import { devicesApi, type FarmDevice, type Powerboard, type PowerboardState } from '../../api/devices'
+import type { DeviceProposal } from '../../api/proposals'
+import { openStatuses, proposalTime } from '../proposals/proposalMeta'
+import { useProposals } from '../proposals/useProposals'
+import { DeviceFormDialog, PowerboardFormDialog } from './DeviceDialogs'
+import { deviceTypeMeta } from './deviceTypes'
+import { useDevicesData } from './useDevicesData'
 
-function formatCapturedAt(capturedAt: string | null) {
-  return capturedAt
-    ? `Captured ${new Date(capturedAt).toLocaleString()}`
-    : "No image synced yet";
+type Deletion = { kind: 'device', item: FarmDevice } | { kind: 'powerboard', item: Powerboard }
+
+/** The outlet's on/off state, or null when it is unknown (board unread, unreachable or missing the outlet). */
+function outletOn(device: FarmDevice, state?: PowerboardState) {
+  return state?.outlets?.[device.outletNum - 1] ?? null
+}
+
+function OutletState({ device, state, checking }: { device: FarmDevice, state?: PowerboardState, checking: boolean }) {
+  if (!state) return checking ? <Badge variant="outline">Checking…</Badge> : null
+  if (!state.outlets) return <Badge variant="destructive" title={state.error ?? undefined}>Unreachable</Badge>
+  if (device.outletNum > state.outlets.length) {
+    return <Badge variant="destructive">No outlet {device.outletNum} on this powerboard</Badge>
+  }
+  return state.outlets[device.outletNum - 1] ? <Badge>On</Badge> : <Badge variant="secondary">Off</Badge>
+}
+
+function OpenProposalBadge({ proposal }: { proposal?: DeviceProposal }) {
+  if (proposal?.status === 'running' && proposal.endsAt) {
+    return <Badge variant="outline">Agent run until {proposalTime.format(Date.parse(proposal.endsAt))}</Badge>
+  }
+  if (proposal?.status === 'pending') return <Badge variant="outline">Proposal awaiting review</Badge>
+  return null
+}
+
+function PowerboardStatus({ state, checking }: { state?: PowerboardState, checking: boolean }) {
+  if (!state) return checking ? <Badge variant="outline">Checking…</Badge> : null
+  if (!state.outlets) return <Badge variant="destructive">Unreachable</Badge>
+  return <Badge variant="secondary">Online · {state.outlets.length} outlets</Badge>
 }
 
 export function DevicesPage() {
-  const { devices, cameraImages, cameraStatus, toggleDevice } =
-    useFarmDevices();
+  const {
+    powerboards,
+    devices,
+    status,
+    error,
+    states,
+    statesStatus,
+    statesError,
+    refresh,
+    refreshStates,
+    setOutletState,
+  } = useDevicesData()
+  const { proposals: openProposals, refresh: refreshProposals } = useProposals({ statuses: openStatuses })
+  // Dialogs remount (new key) on every opening so their forms start from the selected record.
+  const [deviceDialog, setDeviceDialog] = useState({ key: 0, open: false, device: null as FarmDevice | null })
+  const [boardDialog, setBoardDialog] = useState({ key: 0, open: false, powerboard: null as Powerboard | null })
+  const [deletion, setDeletion] = useState<Deletion | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  // Kept after closing so the dialog does not change text while it animates out.
+  const [turnOnDialog, setTurnOnDialog] = useState({ open: false, device: null as FarmDevice | null })
+  const [switchingId, setSwitchingId] = useState<string | null>(null)
+  const [switchError, setSwitchError] = useState('')
+  const checking = statesStatus === 'loading'
+  const boardNames = Object.fromEntries(powerboards.map((powerboard) => [powerboard.id, powerboard.name]))
+  const openByDevice = Object.fromEntries(openProposals.map((proposal) => [proposal.deviceId, proposal]))
 
-  const [filter, setFilter] = useState<DeviceType | "all">("all");
-  const [activeCamera, setActiveCamera] = useState<Device | null>(null);
+  async function switchDevice(device: FarmDevice, on: boolean) {
+    setSwitchingId(device.id)
+    setSwitchError('')
+    try {
+      if (on) await devicesApi.turnOn(device.id)
+      else await devicesApi.turnOff(device.id)
+      if (states[device.powerboardId]?.outlets) setOutletState(device.powerboardId, device.outletNum, on)
+      else refreshStates()
+    } catch (cause) {
+      setSwitchError(`Could not switch ${device.name} ${on ? 'on' : 'off'}. ${errorDetail(cause, 'Refresh and try again.')}`)
+    } finally {
+      setSwitchingId(null)
+      setTurnOnDialog((current) => ({ ...current, open: false }))
+      // Switching off may have stopped an agent run.
+      if (!on) refreshProposals()
+    }
+  }
 
-  const filteredDevices =
-    filter === "all" ? devices : devices.filter((d) => d.type === filter);
+  function openDeviceDialog(device: FarmDevice | null) {
+    setDeviceDialog((current) => ({ key: current.key + 1, open: true, device }))
+  }
+
+  function openBoardDialog(powerboard: Powerboard | null) {
+    setBoardDialog((current) => ({ key: current.key + 1, open: true, powerboard }))
+  }
+
+  function requestDeletion(next: Deletion) {
+    setDeleteError('')
+    setDeletion(next)
+  }
+
+  async function confirmDeletion() {
+    if (!deletion) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      if (deletion.kind === 'device') await devicesApi.remove(deletion.item.id)
+      else await devicesApi.deletePowerboard(deletion.item.id)
+      setDeletion(null)
+      refresh()
+    } catch (cause) {
+      setDeleteError(errorDetail(cause, 'Unable to delete. Refresh and try again.'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header & Filters */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Farm Devices
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Monitor and manage your hardware conditions.
+          <h1 className="text-2xl font-medium tracking-tight">Devices</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Equipment plugged into Kasa powerboards. Switch devices by hand here. The agent can only propose
+            timed runs; a person approves each one on the Overview or Logs page, and the device switches off
+            by itself when the run ends.
           </p>
         </div>
+        <Button type="button" variant="outline" disabled={checking} onClick={refreshStates}>
+          <RefreshCwIcon data-icon="inline-start" />
+          {checking ? 'Reading powerboards…' : 'Refresh states'}
+        </Button>
+      </header>
 
-        <div className="flex items-center gap-4">
-          {cameraStatus === "loading" && (
-            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-          )}
-          <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg overflow-x-auto max-w-full">
-            {["all", "camera", "pump", "doser", "light", "sensor"].map(
-              (type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type as DeviceType | "all")}
-                  className={`px-4 py-2 text-sm font-medium rounded-md capitalize transition-colors whitespace-nowrap ${
-                    filter === type
-                      ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
-                  }`}
-                >
-                  {type}
-                </button>
-              ),
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Device Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredDevices.map((device) => (
-          <DeviceCard
-            key={device.id}
-            device={device}
-            onToggle={() => toggleDevice(device.id)}
-            onViewCamera={() => setActiveCamera(device)}
-          />
-        ))}
-      </div>
-
-      {/* Live Camera Feed Modal */}
-      {activeCamera && (
-        <CameraModal
-          camera={activeCamera}
-          image={cameraImages[activeCamera.id]}
-          onClose={() => setActiveCamera(null)}
-        />
+      {(error || statesError) && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>{error ? 'Devices unavailable' : 'Powerboard states unavailable'}</AlertTitle>
+          <AlertDescription>{error || statesError}</AlertDescription>
+        </Alert>
       )}
-    </div>
-  );
-}
+      {switchError && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertDescription>{switchError}</AlertDescription>
+        </Alert>
+      )}
 
-// --- Subcomponent: Device Card ---
-interface DeviceCardProps {
-  device: Device;
-  onToggle: () => void;
-  onViewCamera: () => void;
-}
-
-function DeviceCard({ device, onToggle, onViewCamera }: DeviceCardProps) {
-  const getTypeConfig = (type: DeviceType) => {
-    switch (type) {
-      case "camera":
-        return {
-          icon: Camera,
-          color: "text-purple-500",
-          bg: "bg-purple-100 dark:bg-purple-900/30",
-        };
-      case "pump":
-        return {
-          icon: Droplets,
-          color: "text-blue-500",
-          bg: "bg-blue-100 dark:bg-blue-900/30",
-        };
-      case "doser":
-        return {
-          icon: TestTube2,
-          color: "text-amber-500",
-          bg: "bg-amber-100 dark:bg-amber-900/30",
-        };
-      case "light":
-        return {
-          icon: Sun,
-          color: "text-yellow-500",
-          bg: "bg-yellow-100 dark:bg-yellow-900/30",
-        };
-      case "sensor":
-        return {
-          icon: Gauge,
-          color: "text-emerald-500",
-          bg: "bg-emerald-100 dark:bg-emerald-900/30",
-        };
-    }
-  };
-
-  const getStatusConfig = (status: DeviceStatus) => {
-    switch (status) {
-      case "online":
-        return { icon: Wifi, color: "text-green-500", label: "Online" };
-      case "offline":
-        return { icon: WifiOff, color: "text-gray-400", label: "Offline" };
-      case "warning":
-        return { icon: AlertTriangle, color: "text-red-500", label: "Warning" };
-    }
-  };
-
-  const TypeIcon = getTypeConfig(device.type).icon;
-  const StatusIcon = getStatusConfig(device.status).icon;
-  const isOff = device.status === "offline";
-  const isSensor = device.type === "sensor";
-
-  return (
-    <div
-      className={`p-5 rounded-xl border bg-white dark:bg-gray-900 transition-all ${
-        isOff
-          ? "border-gray-200 dark:border-gray-800 opacity-75"
-          : "border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md"
-      }`}
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2 rounded-lg ${getTypeConfig(device.type).bg}`}>
-          <TypeIcon className={`w-6 h-6 ${getTypeConfig(device.type).color}`} />
-        </div>
-        <div
-          className={`flex items-center gap-1.5 text-xs font-medium ${getStatusConfig(device.status).color}`}
-        >
-          <StatusIcon className="w-3.5 h-3.5" />
-          {getStatusConfig(device.status).label}
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <h3
-          className="font-semibold text-gray-900 dark:text-white truncate"
-          title={device.name}
-        >
-          {device.name}
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {device.metrics}
-        </p>
-      </div>
-
-      <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
-        {device.type === "camera" ? (
-          <button
-            onClick={onViewCamera}
-            disabled={isOff || !device.isActive}
-            className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-              isOff || !device.isActive
-                ? "text-gray-400 cursor-not-allowed"
-                : "text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
-            }`}
-          >
-            <Video className="w-4 h-4" />
-            View Feed
-          </button>
-        ) : (
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-            {isSensor ? "Monitoring" : device.isActive ? "Running" : "Standby"}
-          </span>
-        )}
-
-        <button
-          onClick={onToggle}
-          disabled={isOff || isSensor}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-            isOff || isSensor
-              ? "bg-gray-200 dark:bg-gray-800 cursor-not-allowed"
-              : device.isActive
-                ? "bg-green-500"
-                : "bg-gray-300 dark:bg-gray-600"
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              device.isActive ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// --- Subcomponent: Camera Feed Modal ---
-function CameraModal({
-  camera,
-  image,
-  onClose,
-}: {
-  camera: Device;
-  image?: CameraImage;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-200 dark:border-gray-800 animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <Camera className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-gray-900 dark:text-white">
-                {camera.name}
-              </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {formatCapturedAt(image?.capturedAt ?? null)}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="relative aspect-video bg-black flex flex-col items-center justify-center group overflow-hidden">
-          {image?.imageUrl ? (
-            <img
-              src={image.imageUrl}
-              alt={`Latest image from ${camera.name}`}
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-gray-400">
-              <ImageOff className="w-10 h-10" />
-              <span className="text-sm">No image synced yet</span>
-            </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Devices</CardTitle>
+          <CardDescription>
+            Each device is one powerboard outlet. On/off states are read live; a device switched on here stays
+            on until switched off.
+          </CardDescription>
+          <CardAction>
+            <Button
+              type="button"
+              size="sm"
+              disabled={powerboards.length === 0}
+              title={powerboards.length === 0 ? 'Add a powerboard first' : undefined}
+              onClick={() => openDeviceDialog(null)}
+            >
+              <PlusIcon data-icon="inline-start" />
+              Add device
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {status === 'loading' && (
+            <>
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </>
           )}
-        </div>
-      </div>
-    </div>
-  );
+          {status !== 'loading' && devices.length === 0 && (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <PlugZapIcon />
+                </EmptyMedia>
+                <EmptyTitle>No devices yet</EmptyTitle>
+                <EmptyDescription>
+                  {powerboards.length === 0
+                    ? 'Add a powerboard below, then add the equipment plugged into it.'
+                    : 'Add the equipment plugged into your powerboards.'}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+          {devices.map((device) => {
+            const { label, Icon } = deviceTypeMeta[device.deviceType]
+            const isOn = outletOn(device, states[device.powerboardId])
+            const switching = switchingId === device.id
+            return (
+              <div key={device.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
+                <Icon className="size-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{device.name}</p>
+                    <Badge variant="outline">{label}</Badge>
+                    {switching
+                      ? <Badge variant="outline">Switching…</Badge>
+                      : <OutletState device={device} state={states[device.powerboardId]} checking={checking} />}
+                    <OpenProposalBadge proposal={openByDevice[device.id]} />
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {boardNames[device.powerboardId] ?? 'Unknown powerboard'} · outlet {device.outletNum}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Switch
+                    checked={isOn === true}
+                    disabled={isOn === null || switchingId !== null}
+                    aria-label={`${device.name} power`}
+                    title={isOn === null ? 'State unknown; refresh the powerboard states' : undefined}
+                    onCheckedChange={(checked) => {
+                      if (checked) setTurnOnDialog({ open: true, device })
+                      else void switchDevice(device, false)
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => openDeviceDialog(device)}>
+                    <PencilIcon data-icon="inline-start" />
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => requestDeletion({ kind: 'device', item: device })}
+                  >
+                    <Trash2Icon data-icon="inline-start" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Powerboards</CardTitle>
+          <CardDescription>Kasa power strips the server reaches over the local network.</CardDescription>
+          <CardAction>
+            <Button type="button" size="sm" variant="outline" onClick={() => openBoardDialog(null)}>
+              <PlusIcon data-icon="inline-start" />
+              Add powerboard
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {status === 'loading' && <Skeleton className="h-14 w-full" />}
+          {status !== 'loading' && powerboards.length === 0 && (
+            <p className="text-sm text-muted-foreground">No powerboards yet.</p>
+          )}
+          {powerboards.map((powerboard) => {
+            const state = states[powerboard.id]
+            const deviceCount = devices.filter((device) => device.powerboardId === powerboard.id).length
+            return (
+              <div key={powerboard.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{powerboard.name}</p>
+                    <PowerboardStatus state={state} checking={checking} />
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    <span className="font-mono">{powerboard.host}</span>
+                    {' · '}
+                    {deviceCount === 1 ? '1 device' : `${deviceCount} devices`}
+                  </p>
+                  {state?.error && <p className="mt-1 text-sm text-destructive">{state.error}</p>}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => openBoardDialog(powerboard)}>
+                    <PencilIcon data-icon="inline-start" />
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => requestDeletion({ kind: 'powerboard', item: powerboard })}
+                  >
+                    <Trash2Icon data-icon="inline-start" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+
+      <DeviceFormDialog
+        key={`device-${deviceDialog.key}`}
+        open={deviceDialog.open}
+        device={deviceDialog.device}
+        powerboards={powerboards}
+        states={states}
+        onOpenChange={(open) => setDeviceDialog((current) => ({ ...current, open }))}
+        onSaved={refresh}
+      />
+      <PowerboardFormDialog
+        key={`powerboard-${boardDialog.key}`}
+        open={boardDialog.open}
+        powerboard={boardDialog.powerboard}
+        onOpenChange={(open) => setBoardDialog((current) => ({ ...current, open }))}
+        onSaved={refresh}
+      />
+
+      <Dialog
+        open={turnOnDialog.open}
+        onOpenChange={(open) => { if (!open && switchingId === null) setTurnOnDialog((current) => ({ ...current, open })) }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Turn on {turnOnDialog.device?.name}?</DialogTitle>
+            <DialogDescription>
+              It stays on until you turn it off here. To run it for a set time, ask the agent to propose a run
+              instead; approved runs switch off by themselves.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={switchingId !== null}
+              onClick={() => setTurnOnDialog((current) => ({ ...current, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={switchingId !== null}
+              onClick={() => { if (turnOnDialog.device) void switchDevice(turnOnDialog.device, true) }}
+            >
+              <PowerIcon data-icon="inline-start" />
+              {switchingId !== null ? 'Turning on…' : 'Turn on'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deletion !== null} onOpenChange={(open) => { if (!open && !deleting) setDeletion(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {deletion?.item.name}?</DialogTitle>
+            <DialogDescription>
+              {deletion?.kind === 'device'
+                ? 'Its pending proposal, if any, is rejected. A run in progress still switches off on time.'
+                : 'Devices still assigned to this powerboard must be moved or deleted first.'}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={deleting} onClick={() => setDeletion(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" disabled={deleting} onClick={() => void confirmDeletion()}>
+              <Trash2Icon data-icon="inline-start" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  )
 }

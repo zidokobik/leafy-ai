@@ -1,6 +1,6 @@
 # Leafy AI Dashboard
 
-A responsive React dashboard for monitoring a Sweet basil hydroponic farm and supporting AI-assisted growing workflows. It provides authenticated access, sensor history, agent chat, and recurring agent schedule management; device controls remain planned.
+A responsive React dashboard for monitoring a Sweet basil hydroponic farm and supporting AI-assisted growing workflows. It provides authenticated access, sensor history, alerts, agent chat, recurring agent schedules, powerboard and device management, and review of the device runs the agent proposes.
 
 ## Commands
 
@@ -78,9 +78,12 @@ src/
 ├── components/          App shell and shared shadcn/ui primitives
 ├── features/
 │   ├── agents/          Farm agent chat page and the Overview chat sheet
+│   ├── alerts/          Alerts page, the Overview alert pin and email notifications
 │   ├── auth/            Login, session state and account settings
-│   ├── devices/         Placeholder for device controls
+│   ├── devices/         Powerboard and device management, live outlet states and manual on/off
+│   ├── logpage/         Log of every device proposal, its review and run outcome
 │   ├── overview/        Sensor history charts and range controls
+│   ├── proposals/       Shared proposal hooks and actions, and the Overview proposal strip
 │   └── schedules/       Agent schedule management
 ├── hooks/               Shared React hooks used by shadcn components
 ├── lib/                 Shared utilities such as `cn`

@@ -17,6 +17,16 @@ export class ApiError extends Error {
   }
 }
 
+/** The server's `detail` message for a failed request, or `fallback` when there is none. */
+export function errorDetail(cause: unknown, fallback: string) {
+  if (cause instanceof ApiError) {
+    const detail = (cause.details as { detail?: unknown } | undefined)?.detail
+    if (typeof detail === 'string') return detail
+    if (cause.status === 408) return 'The request timed out. Refresh to check whether it went through.'
+  }
+  return fallback
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const controller = new AbortController()
   const abortFromCaller = () => controller.abort()

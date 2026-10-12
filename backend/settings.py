@@ -39,6 +39,11 @@ class Settings(BaseSettings):
 	# Implicit TLS (port 465). When false, STARTTLS is negotiated if the server offers it.
 	SMTP_USE_TLS: bool = False
 
+	# TP-Link account login, only needed for powerboards whose firmware requires authentication
+	# (newer Kasa firmware and Tapo strips). Older Kasa power strips work without it.
+	KASA_USERNAME: str | None = None
+	KASA_PASSWORD: SecretStr | None = None
+
 	model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
