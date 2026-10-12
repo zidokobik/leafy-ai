@@ -30,6 +30,8 @@ from pathlib import Path
 
 import numpy as np
 
+from leafy_cv.csv_files import write_csv
+
 STATUSES = ("ready", "candidate", "growing", "empty")
 MISSED = ("growing", "empty")  # a crowded plant with these statuses gets no alert
 BOOTSTRAP = 2000
@@ -176,10 +178,7 @@ def main() -> None:
 			print(f"  {threshold:.2f}  {np.mean((contact >= threshold) == truth):.1%}")
 
 	args.out.parent.mkdir(parents=True, exist_ok=True)
-	with open(args.out, "w", newline="", encoding="utf-8") as handle:
-		writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-		writer.writeheader()
-		writer.writerows(rows)
+	write_csv(args.out, list(rows[0]), rows)
 	print(f"\nWrote {args.out}")
 
 

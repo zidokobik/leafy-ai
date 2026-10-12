@@ -34,6 +34,7 @@ FEATURE_NAMES = (
 	"lap_mean",
 )
 MIN_MASK_PIXELS = 20
+DEFAULT_PLANT_FILTER = Path(__file__).resolve().parents[2] / "trained" / "plant_filter.json"
 
 
 @dataclass(frozen=True)

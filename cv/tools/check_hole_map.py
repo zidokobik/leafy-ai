@@ -10,12 +10,13 @@ three frames, zones cover only the closed canopy, and no check says FAIL.
 """
 
 import argparse
-import csv
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from leafy_cv.drawing import put_outlined_text
+from leafy_cv.frame_index import map_frames
 from leafy_cv.frames import read_image
 from leafy_cv.hole_map import (
 	ACROSS,
@@ -33,18 +34,6 @@ from leafy_cv.hole_map import (
 # A cell's expected area is about spacing^2 (Voronoi cell of a square grid). Perspective makes near
 # cells ~3x bigger than far ones, so compare each cell with its own spacing, not with the median.
 MAX_AREA_VS_EXPECTED = 1.6
-
-
-def usable_frames(index_csv: Path, camera_id: str, valid_from: str, valid_to: str | None) -> list[str]:
-	with open(index_csv, encoding="utf-8") as handle:
-		return [
-			row["file"]
-			for row in csv.DictReader(handle)
-			if row["camera_id"] == camera_id
-			and row["usable"] == "True"
-			and row["captured_at"] >= valid_from
-			and (valid_to is None or row["captured_at"] <= valid_to)
-		]
 
 
 def main() -> None:
@@ -116,7 +105,7 @@ def main() -> None:
 	for zone in hole_map.zones:
 		print(f"  zone {zone.name}: {int(zone_mask(zone, hole_map.image_size).sum())} px, {len(zone.polygon)} corners")
 
-	files = usable_frames(args.index_csv, hole_map.camera_id, hole_map.valid_from, hole_map.valid_to)
+	files = [row["file"] for row in map_frames(args.index_csv, hole_map)[0]]  # the map's own period
 	if not files:
 		raise SystemExit("No usable frames in this period; check data/frame_index.csv and the map's dates")
 	picks = [files[0], files[len(files) // 2], files[-1]]
@@ -124,8 +113,7 @@ def main() -> None:
 	for name in picks:
 		image = read_image(args.frames_root / hole_map.camera_id / name)
 		panel = draw_overlay(image, hole_map, cells)
-		cv2.putText(panel, name, (8, panel.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3)
-		cv2.putText(panel, name, (8, panel.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+		put_outlined_text(panel, name, (8, panel.shape[0] - 10), 0.5)
 		panels.append(panel)
 	args.out_dir.mkdir(parents=True, exist_ok=True)
 	out = args.out_dir / f"{hole_map.camera_id}_{hole_map.period}.jpg"

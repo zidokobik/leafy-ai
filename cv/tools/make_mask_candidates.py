@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
+from leafy_cv.csv_files import write_csv
 from leafy_cv.frames import read_image
 from leafy_cv.hole_map import HoleMap, build_cells
 from leafy_cv.plant_filter import MIN_MASK_PIXELS, pack_masks
@@ -150,10 +151,7 @@ def main() -> None:
 
 	rows = [rows[i] | {"order": rank} for rank, i in enumerate(rng.permutation(len(rows)))]
 	args.out_dir.mkdir(parents=True, exist_ok=True)
-	with open(args.out_dir / "candidates.csv", "w", newline="", encoding="utf-8") as handle:
-		writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-		writer.writeheader()
-		writer.writerows(rows)
+	write_csv(args.out_dir / "candidates.csv", list(rows[0]), rows)
 	np.savez_compressed(args.out_dir / "masks.npz", **packed)
 	print(f"\nWrote {len(rows)} outlines to {args.out_dir}. Next: tools/label_masks.py")
 

@@ -29,6 +29,8 @@ import random
 from collections import defaultdict
 from pathlib import Path
 
+from leafy_cv.csv_files import write_csv
+
 QUOTAS = {"ready": 32, "growing": 32, "candidate": 12, "empty": 6}
 EARLY_CAMERA, EARLY_DAYS = "level1_camera2", ("2026-09-30", "2026-10-01")
 EARLY_QUOTAS = {"ready": 8, "growing": 4}  # of camera 2's ready / growing quotas
@@ -151,15 +153,12 @@ def main() -> None:
 		for n, row in enumerate(picked)
 	]
 	args.out.parent.mkdir(parents=True, exist_ok=True)
-	with open(args.out, "w", newline="", encoding="utf-8") as handle:
-		writer = csv.DictWriter(handle, fieldnames=list(items[0]))
-		writer.writeheader()
-		writer.writerows(items)
-	with open(args.out.parent / "strata.csv", "w", newline="", encoding="utf-8") as handle:
-		writer = csv.writer(handle)
-		writer.writerow(["camera_id", "status", "hole_days_available", "picked"])
-		for (camera, status), (available, n) in strata.items():
-			writer.writerow([camera, status, available, n])
+	write_csv(args.out, list(items[0]), items)
+	strata_rows = [
+		{"camera_id": camera, "status": status, "hole_days_available": available, "picked": n}
+		for (camera, status), (available, n) in strata.items()
+	]
+	write_csv(args.out.parent / "strata.csv", ["camera_id", "status", "hole_days_available", "picked"], strata_rows)
 	print(f"Wrote {len(items)} items to {args.out} (strata in {args.out.parent / 'strata.csv'}):")
 	for (camera, status), (available, n) in strata.items():
 		print(f"  {camera} {status}: {n} of {available} hole-days")

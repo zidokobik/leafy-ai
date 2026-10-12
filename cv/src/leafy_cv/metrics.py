@@ -49,7 +49,6 @@ Closure counts every gap, including gaps along a channel that expansion doesn't 
 import time
 from dataclasses import dataclass
 
-import cv2
 import numpy as np
 
 from leafy_cv.hole_map import Cells, HoleMap, zone_mask
@@ -235,11 +234,3 @@ def hole_contact(contacts: dict[tuple[int, int], tuple[int, int]], pairs: list[t
 	frame."""
 	shares = [contacts[pair][0] / contacts[pair][1] for pair in pairs if contacts[pair][1]]
 	return max(shares) if shares else None
-
-
-def draw_plant_outline(image_bgr: np.ndarray, plant_mask: np.ndarray, colour=(255, 255, 255)) -> np.ndarray:
-	"""Thin contour of the plant pixels on a copy of the image."""
-	out = image_bgr.copy()
-	contours, _ = cv2.findContours(plant_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-	cv2.drawContours(out, contours, -1, colour, 1)
-	return out

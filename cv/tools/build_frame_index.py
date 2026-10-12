@@ -16,20 +16,19 @@ corrected by hand on 11 Oct (the tool can't recreate those corrections). Back th
 """
 
 import argparse
-import csv
 from collections import Counter
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from leafy_cv.csv_files import format_optional, write_csv
+from leafy_cv.drawing import put_outlined_text
 from leafy_cv.drift import DEFAULT_FIXED_PARTS, Alignment, align, extract_features, load_fixed_parts
 from leafy_cv.frame_index import OK, USABLE_STATUSES, label_sequence
 from leafy_cv.frames import Frame, list_frames, read_image
-from leafy_cv.plant_filter import PlantFilter
+from leafy_cv.plant_filter import DEFAULT_PLANT_FILTER, PlantFilter
 from leafy_cv.scene import plant_change, plant_cover, plant_tiles
-
-DEFAULT_PLANT_FILTER = Path(__file__).resolve().parents[1] / "trained" / "plant_filter.json"
 
 
 def save_event_image(before: Frame, after: Frame, status: str, detail: str, out_dir: Path) -> None:
@@ -37,12 +36,10 @@ def save_event_image(before: Frame, after: Frame, status: str, detail: str, out_
 	for frame, title in ((before, "compared with"), (after, status)):
 		image = read_image(frame.path)
 		text = f"{title}: {frame.captured_at:%d %b %H:%M}"
-		cv2.putText(image, text, (10, image.shape[0] - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4)
-		cv2.putText(image, text, (10, image.shape[0] - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+		put_outlined_text(image, text, (10, image.shape[0] - 14), 0.6, outline=4)
 		images.append(image)
 	pair = np.hstack(images)
-	cv2.putText(pair, detail, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4)
-	cv2.putText(pair, detail, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+	put_outlined_text(pair, detail, (10, 28), 0.6, outline=4)
 	name = f"{after.camera_id}_{after.captured_at:%Y%m%d_%H%M}_{status}.jpg"
 	cv2.imwrite(str(out_dir / name), pair)
 
@@ -109,10 +106,10 @@ def main() -> None:
 					"first_of_day": first_of_day[k],
 					"plant_cover": f"{plant_cover(tiles[k]):.3f}",
 					"compared_with": frames[label.compared_with].path.name if label.compared_with is not None else "",
-					"inliers": label.inliers if label.inliers is not None else "",
-					"shift_px": f"{label.shift_px:.1f}" if label.shift_px is not None else "",
-					"rotation_deg": f"{label.rotation_deg:.2f}" if label.rotation_deg is not None else "",
-					"plant_change": f"{label.plant_change:.3f}" if label.plant_change is not None else "",
+					"inliers": format_optional(label.inliers),
+					"shift_px": format_optional(label.shift_px, ".1f"),
+					"rotation_deg": format_optional(label.rotation_deg, ".2f"),
+					"plant_change": format_optional(label.plant_change, ".3f"),
 				}
 			)
 			if label.status != OK and label.compared_with is not None and not args.no_event_images:
@@ -139,10 +136,7 @@ def main() -> None:
 
 	args.out_dir.mkdir(parents=True, exist_ok=True)
 	for name, rows in (("frame_index.csv", index_rows), ("periods.csv", period_rows)):
-		with open(args.out_dir / name, "w", newline="", encoding="utf-8") as handle:
-			writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-			writer.writeheader()
-			writer.writerows(rows)
+		write_csv(args.out_dir / name, list(rows[0]), rows)
 
 	print(f"\nIndexed {len(index_rows)} frames from {len(by_camera)} cameras; skipped {len(skipped)} other .jpg files.")
 	print("\nStatus counts per camera:")

@@ -14,7 +14,9 @@ from leafy_cv.frame_index import (
 	UNCONFIRMED,
 	UNSTABLE,
 	label_sequence,
+	map_frames,
 )
+from leafy_cv.hole_map import Hole, HoleMap
 
 
 def run(frames: list[tuple[float, str]]):
@@ -116,3 +118,26 @@ def test_clear_move_needs_many_fixed_part_matches_and_a_real_shift():
 	assert not Alignment(inliers=16, shift_px=23.0, rotation_deg=0.0).clear_move
 	assert not Alignment(inliers=300, shift_px=1.0, rotation_deg=0.0, plant_change=0.5).clear_move
 	assert not Alignment(inliers=300, shift_px=1.0, rotation_deg=0.0, plant_change=0.5).stable
+
+
+def test_map_frames_keeps_the_maps_own_period(tmp_path):
+	# check_hole_map used to take every usable frame in the map's dates, incl. a later layout's (12 Oct)
+	rows = [
+		("f3", "2026-10-02T10:00:00", "P2", "True"),
+		("f1", "2026-10-01T10:00:00", "P2", "True"),
+		("f2", "2026-10-01T11:00:00", "P2", "False"),
+		("f4", "2026-10-03T10:00:00", "P3", "True"),
+		("g1", "2026-10-01T12:00:00", "P2", "True"),  # another camera
+		("f0", "2026-09-30T10:00:00", "P2", "True"),  # before the map's dates
+	]
+	lines = ["camera_id,file,captured_at,period,usable"]
+	for file, at, period, usable in rows:
+		camera = "level1_camera3" if file.startswith("g") else "level1_camera2"
+		lines.append(f"{camera},{file}.jpg,{at},{period},{usable}")
+	(tmp_path / "index.csv").write_text("\n".join(lines) + "\n")
+	hole_map = HoleMap(
+		"level1_camera2", 1, "P2", "2026-10-01T00:00:00", None, (10, 10), "f1.jpg", [Hole("L1-C2-R01-H01", 1, 1, 1, 1)]
+	)
+	mine, other = map_frames(tmp_path / "index.csv", hole_map)
+	assert [r["file"] for r in mine] == ["f1.jpg", "f3.jpg"]  # usable, own period, in the dates, oldest first
+	assert [r["file"] for r in other] == ["f4.jpg"]

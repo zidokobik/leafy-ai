@@ -191,9 +191,12 @@ server should install the CPU build of torch.
 - `leafy_cv/frames.py`: finds frames on disk and reads camera + time from the file name.
 - `leafy_cv/drift.py`: measures how far the camera moved between two frames (ORB keypoints on fixed parts + RANSAC).
 - `leafy_cv/scene.py`: where the plants are, in 16 px tiles, and how much that changed between two frames.
-- `leafy_cv/frame_index.py`: turns those measurements into frame statuses and periods.
+- `leafy_cv/frame_index.py`: turns those measurements into frame statuses and periods; reads `data/frame_index.csv`
+  (a map's usable frames of its own period).
 - `leafy_cv/hole_map.py`: loads/saves hole maps and builds each hole's cell, neighbours, partners in both directions and gap corridors.
 - `leafy_cv/segment.py`: MobileSAM prompted at points, with neighbours as "not this" points.
 - `leafy_cv/plant_filter.py`: colour and texture features of an outline, and the trained plant filter.
 - `leafy_cv/metrics.py`: per-frame numbers: outline choice, coverage, boundary contact, zone closure.
 - `leafy_cv/readiness.py`: the readiness rule (statuses from the numbers, 3-frame streak, hysteresis).
+- `leafy_cv/csv_files.py`: writing the CSV outputs (safely, through a temporary file).
+- `leafy_cv/drawing.py`: small drawing helpers (outlined text, plant outlines) for overlays and check images.

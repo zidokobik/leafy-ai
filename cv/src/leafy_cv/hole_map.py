@@ -44,6 +44,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from leafy_cv.drawing import put_outlined_text
+
 CELL_RADIUS_FACTOR = 0.65  # x local spacing; a square grid's Voronoi corner sits at 0.71
 # Gap corridor (crowding) between a plant and its partner: this share of the along-channel spacing wide
 # (along a channel: also at most this share of the distance to the next channel), crossed by this many
@@ -524,8 +526,7 @@ def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells) -> np.n
 		polygon = np.array(zone.polygon, np.int32)
 		cv2.polylines(out, [polygon], True, (255, 255, 255), 2)
 		anchor = tuple(polygon.min(axis=0) + (6, 18))
-		cv2.putText(out, f"zone: {zone.name}", anchor, cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 3)
-		cv2.putText(out, f"zone: {zone.name}", anchor, cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+		put_outlined_text(out, f"zone: {zone.name}", anchor, 0.45)
 	palette = [(66, 135, 245), (245, 170, 66), (80, 200, 120), (200, 90, 220), (240, 220, 70), (90, 220, 230)]
 	tint = out.copy()
 	for i, hole in enumerate(hole_map.holes):
@@ -548,6 +549,5 @@ def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells) -> np.n
 		if not cells.reliable[i]:
 			cv2.circle(out, centre, 8, (0, 0, 255), 2)
 		text = f"R{hole.row}H{hole.col}" + ("" if cells.reliable[i] else " x")
-		cv2.putText(out, text, (centre[0] + 5, centre[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 0), 3)
-		cv2.putText(out, text, (centre[0] + 5, centre[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1)
+		put_outlined_text(out, text, (centre[0] + 5, centre[1] - 5), 0.35)
 	return out

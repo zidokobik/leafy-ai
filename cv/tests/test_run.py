@@ -93,7 +93,7 @@ def go(run, tmp_path, measure, filter_hash, limit=0):
 		threads=1,
 		overlays="none",
 	)
-	return run.run_map(args, tmp_path / "map.json", None, filter_hash, [object()])
+	return run.run_map(args, tmp_path / "map.json", None, filter_hash, lambda: None)
 
 
 def read(tmp_path, name):
