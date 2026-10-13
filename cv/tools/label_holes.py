@@ -22,22 +22,35 @@ Answers go to labels/readiness/labels.csv.
 
 import argparse
 import csv
-from datetime import datetime
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from leafy_cv.hole_map import HoleMap, build_cells
+from leafy_cv.hole_map import Cells, HoleMap, build_cells
+from leafy_cv.labelling import THUMB_WIDTH, LabelSession, ReadinessLabel, compose, read_labels, run_session, thumbnail
 
 WINDOW = "label holes"
-LABELS = {ord("y"): "crowded", ord("n"): "not_crowded", ord("e"): "empty", ord("u"): "unsure"}
+LABELS = {
+	ord("y"): ReadinessLabel.CROWDED,
+	ord("n"): ReadinessLabel.NOT_CROWDED,
+	ord("e"): ReadinessLabel.EMPTY,
+	ord("u"): ReadinessLabel.UNSURE,
+}
 PANEL = 340
-THUMB_WIDTH = 352
 DOT_RADIUS = 4  # px in the close-up
+INSTRUCTIONS = [
+	"",
+	"Do the leaves of the YELLOW-dot plant touch",
+	"the leaves of ANY WHITE-dot plant",
+	"(same channel or next channel)?",
+	"",
+	"y crowded   n not yet   e empty   u unsure",
+	"b back      q quit",
+]
 
 
-def render(image: np.ndarray, hole_map: HoleMap, cells, hole_index: int, status: str) -> np.ndarray:
+def render(image: np.ndarray, hole_map: HoleMap, cells: Cells, hole_index: int, status: str) -> np.ndarray:
 	height, width = image.shape[:2]
 	hole = hole_map.holes[hole_index]
 	region = cells.cell(hole_index) | cells.corridors[hole_index]
@@ -60,46 +73,45 @@ def render(image: np.ndarray, hole_map: HoleMap, cells, hole_index: int, status:
 		cv2.circle(left, at, DOT_RADIUS + 1, (0, 0, 0), -1)
 		cv2.circle(left, at, DOT_RADIUS, colour, -1)
 
-	thumb = image.copy()
-	cv2.rectangle(thumb, (x0, y0), (x1, y1), (255, 255, 255), 2)
-	thumb = cv2.resize(thumb, (THUMB_WIDTH, int(height * THUMB_WIDTH / width)))
-
-	gap = 8
-	canvas = np.full((PANEL + gap + thumb.shape[0] + 8, max(2 * PANEL + gap, THUMB_WIDTH + 470), 3), 32, np.uint8)
-	canvas[: left.shape[0], : left.shape[1]] = left
-	canvas[: right.shape[0], left.shape[1] + gap : left.shape[1] + gap + right.shape[1]] = right
-	ty = PANEL + gap
-	canvas[ty : ty + thumb.shape[0], :THUMB_WIDTH] = thumb
-	lines = [
-		*status.split("\n"),
-		"",
-		"Do the leaves of the YELLOW-dot plant touch",
-		"the leaves of ANY WHITE-dot plant",
-		"(same channel or next channel)?",
-		"",
-		"y crowded   n not yet   e empty   u unsure",
-		"b back      q quit",
-	]
-	for i, line in enumerate(lines):
-		at = (THUMB_WIDTH + 14, ty + 22 + 22 * i)
-		cv2.putText(canvas, line, at, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (235, 235, 235), 1)
-	return canvas
+	thumb = thumbnail(image.copy(), (x0, y0, x1, y1))
+	lines = [*status.split("\n"), *INSTRUCTIONS]
+	return compose(left, right, thumb, lines, PANEL, max(2 * PANEL + 8, THUMB_WIDTH + 470))
 
 
-def read_labels(path: Path) -> list[dict]:
-	if not path.exists():
-		return []
-	with open(path, encoding="utf-8") as handle:
-		return list(csv.DictReader(handle))
+class ItemScreens:
+	"""Draws the screen for one labelling item; loads each hole map's cells once."""
 
+	def __init__(self, frames_root: Path, maps_dir: Path, session: LabelSession):
+		self.frames_root, self.maps_dir, self.session = frames_root, maps_dir, session
+		self.hole_maps: dict[tuple[str, str], HoleMap] = {}
+		for path in sorted(maps_dir.glob("*.json")):
+			hole_map = HoleMap.load(path)
+			self.hole_maps[(hole_map.camera_id, hole_map.period)] = hole_map
+		self.cells: dict[tuple[str, str], Cells] = {}
 
-def write_labels(path: Path, labels: list[dict]) -> None:
-	tmp = path.with_suffix(".tmp")
-	with open(tmp, "w", newline="", encoding="utf-8") as handle:
-		writer = csv.DictWriter(handle, fieldnames=["item_id", "label", "labelled_at"])
-		writer.writeheader()
-		writer.writerows(labels)
-	tmp.replace(path)
+	def __call__(self, item: dict) -> np.ndarray:
+		key = (item["camera_id"], item["period"])
+		if key not in self.hole_maps:
+			raise SystemExit(f"No hole map for {item['camera_id']} {item['period']} in {self.maps_dir}")
+		hole_map = self.hole_maps[key]
+		if key not in self.cells:
+			self.cells[key] = build_cells(hole_map)
+		index = next((i for i, h in enumerate(hole_map.holes) if h.hole_id == item["hole_id"]), None)
+		if index is None:
+			raise SystemExit(f"{item['hole_id']} is not in the {item['camera_id']} {item['period']} map (map changed?)")
+		path = self.frames_root / item["camera_id"] / item["file"]
+		image = cv2.imread(str(path))
+		if image is None:
+			raise SystemExit(f"Could not read {path}; check --frames-root")
+		return render(image, hole_map, self.cells[key], index, self.status())
+
+	def status(self) -> str:
+		s = self.session
+		return (
+			f"{len(s.labels)} of {len(s.items)} answered\n"
+			f"crowded {s.count(ReadinessLabel.CROWDED)}  not yet {s.count(ReadinessLabel.NOT_CROWDED)}  "
+			f"empty {s.count(ReadinessLabel.EMPTY)}  unsure {s.count(ReadinessLabel.UNSURE)}"
+		)
 
 
 def main() -> None:
@@ -111,69 +123,15 @@ def main() -> None:
 
 	with open(args.dir / "items.csv", encoding="utf-8") as handle:
 		items = sorted(csv.DictReader(handle), key=lambda r: int(r["order"]))
-	hole_maps = {}
-	for path in sorted(args.hole_maps.glob("*.json")):
-		hole_map = HoleMap.load(path)
-		hole_maps[(hole_map.camera_id, hole_map.period)] = hole_map
-	cells_cache: dict[tuple[str, str], object] = {}
 	labels_path = args.dir / "labels.csv"
-	labels = read_labels(labels_path)
-	done = {row["item_id"] for row in labels}
-	queue = [item for item in items if item["item_id"] not in done]
+	session = LabelSession(items, "item_id", read_labels(labels_path))
+	screens = ItemScreens(args.frames_root, args.hole_maps, session)  # loads the hole maps (fails early if one is bad)
 	print(__doc__)
-	print(f"{len(labels)} answered so far, {len(queue)} to go.")
-	if not queue:
+	print(f"{len(session.labels)} answered so far, {len(session.queue)} to go.")
+	if not session.queue:
 		return
-
-	cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
-	position = 0
-	while position < len(queue):
-		item = queue[position]
-		key_map = (item["camera_id"], item["period"])
-		if key_map not in hole_maps:
-			raise SystemExit(f"No hole map for {item['camera_id']} {item['period']} in {args.hole_maps}")
-		hole_map = hole_maps[key_map]
-		if key_map not in cells_cache:
-			cells_cache[key_map] = build_cells(hole_map)
-		cells = cells_cache[key_map]
-		index = next((i for i, h in enumerate(hole_map.holes) if h.hole_id == item["hole_id"]), None)
-		if index is None:
-			raise SystemExit(f"{item['hole_id']} is not in the {item['camera_id']} {item['period']} map (map changed?)")
-		path = args.frames_root / item["camera_id"] / item["file"]
-		image = cv2.imread(str(path))
-		if image is None:
-			raise SystemExit(f"Could not read {path}; check --frames-root")
-		counts = {name: sum(r["label"] == name for r in labels) for name in LABELS.values()}
-		status = (
-			f"{len(labels)} of {len(items)} answered\n"
-			f"crowded {counts['crowded']}  not yet {counts['not_crowded']}  "
-			f"empty {counts['empty']}  unsure {counts['unsure']}"
-		)
-		cv2.imshow(WINDOW, render(image, hole_map, cells, index, status))
-		key = cv2.waitKey(0) & 0xFF
-		if key in LABELS:
-			labels.append(
-				{
-					"item_id": item["item_id"],
-					"label": LABELS[key],
-					"labelled_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-				}
-			)
-			write_labels(labels_path, labels)
-			position += 1
-		elif key == ord("b") and labels:
-			undone = labels.pop()
-			write_labels(labels_path, labels)
-			if position > 0 and queue[position - 1]["item_id"] == undone["item_id"]:
-				position -= 1
-			else:  # answered in an earlier session: put it back in front
-				queue.insert(position, next(i for i in items if i["item_id"] == undone["item_id"]))
-		elif key in (ord("q"), 27):
-			break
-		if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
-			break
-	cv2.destroyAllWindows()
-	print(f"Saved {len(labels)} answers to {labels_path}.")
+	run_session(session, labels_path, LABELS, screens, WINDOW)
+	print(f"Saved {len(session.labels)} answers to {labels_path}.")
 	print("Then: uv run python tools/evaluate_readiness.py")
 
 

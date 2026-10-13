@@ -25,7 +25,7 @@ from sklearn.model_selection import GroupKFold, cross_val_predict
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from leafy_cv.drawing import put_outlined_text
+from leafy_cv.drawing import dim_outside, put_outlined_text
 from leafy_cv.plant_filter import FEATURE_NAMES, PlantFilter, mask_features, unpack_masks
 
 MIN_LABELS = 100
@@ -52,8 +52,7 @@ def error_sheet(rows: list[dict], images: dict[str, np.ndarray], masks: dict[str
 		pad = 20
 		x0, y0 = max(0, x0 - pad), max(0, y0 - pad)
 		x1, y1 = min(image.shape[1], x1 + pad), min(image.shape[0], y1 + pad)
-		lit = image.copy()
-		lit[~mask] = (lit[~mask] * 0.35).astype(np.uint8)
+		lit = dim_outside(image, mask)
 		tile = cv2.resize(lit[y0:y1, x0:x1], (200, 160))
 		text = f"said {row['label']}, p(plant) {row['p']:.2f}"
 		put_outlined_text(tile, text, (4, 154), 0.4)

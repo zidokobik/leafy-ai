@@ -45,7 +45,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from leafy_cv.drawing import put_outlined_text
+from leafy_cv.drawing import ROW_PALETTE, put_outlined_text
 
 CELL_RADIUS_FACTOR = 0.65  # x local spacing; a square grid's Voronoi corner sits at 0.71
 # Gap corridor (crowding) between a plant and its partner: this share of the along-channel spacing wide
@@ -181,6 +181,11 @@ class HoleMap:
 def camera_number(camera_id: str) -> int:
 	"""level1_camera2 -> 2"""
 	return int(camera_id.rsplit("camera", 1)[1])
+
+
+def level_number(camera_id: str) -> int:
+	"""level1_camera2 -> 1"""
+	return int(camera_id.split("_")[0].removeprefix("level"))
 
 
 def make_hole_id(level: int, camera: int, row: int, col: int) -> str:
@@ -582,10 +587,9 @@ def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells) -> np.n
 		cv2.polylines(out, [polygon], True, (255, 255, 255), 2)
 		anchor = tuple(polygon.min(axis=0) + (6, 18))
 		put_outlined_text(out, f"zone: {zone.name}", anchor, 0.45)
-	palette = [(66, 135, 245), (245, 170, 66), (80, 200, 120), (200, 90, 220), (240, 220, 70), (90, 220, 230)]
 	tint = out.copy()
 	for i, hole in enumerate(hole_map.holes):
-		colour = palette[(hole.row - 1) % len(palette)]
+		colour = ROW_PALETTE[(hole.row - 1) % len(ROW_PALETTE)]
 		cell = cells.cell(i)
 		tint[cell] = colour
 		tint[cells.corridors[i] & cell] = tuple(int(c * 0.55) for c in colour)

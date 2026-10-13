@@ -199,4 +199,7 @@ server should install the CPU build of torch.
 - `leafy_cv/metrics.py`: per-frame numbers: outline choice, coverage, boundary contact, zone closure.
 - `leafy_cv/readiness.py`: the readiness rule (statuses from the numbers, 3-frame streak, hysteresis).
 - `leafy_cv/csv_files.py`: writing the CSV outputs (safely, through a temporary file).
-- `leafy_cv/drawing.py`: small drawing helpers (outlined text, plant outlines) for overlays and check images.
+- `leafy_cv/drawing.py`: small drawing helpers (outlined text, plant outlines, row colours, dimming) for overlays,
+  check images and the labelling tools.
+- `leafy_cv/labelling.py`: the labelling session shared by `label_holes.py` and `label_masks.py` (answers saved after
+  every key, back, resume) and their common screen layout.

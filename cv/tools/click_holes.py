@@ -32,18 +32,23 @@ Always:
 
 import argparse
 import csv
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from leafy_cv.frames import parse_frame_path
-from leafy_cv.hole_map import HoleMap, Zone, camera_number, number_holes, row_problems, zone_problems
+from leafy_cv.drawing import ROW_PALETTE
+from leafy_cv.frames import Frame, parse_frame_path
+from leafy_cv.hole_map import HoleMap, Zone, camera_number, level_number, number_holes, row_problems, zone_problems
 
 WINDOW = "click holes"
-ROW_COLOURS = [(66, 135, 245), (245, 170, 66), (80, 200, 120), (200, 90, 220), (240, 220, 70), (90, 220, 230)]
 DELETE_RADIUS_PX = 20
 FIRST_ZONE_NAME = "canopy_far"
+# What the key loop does after a key: carry on, redraw at once (skip the window-closed check), or stop.
+GO, AGAIN, STOP = "go", "again", "stop"
+
+Point = tuple[float, float, bool]  # a clicked hole centre: x, y, estimated
 
 
 def period_dates(periods_csv: Path, camera_id: str, period: str) -> tuple[str, str | None]:
@@ -70,6 +75,263 @@ def next_zone_name(zones: list[Zone]) -> str:
 	return f"canopy_{n}"
 
 
+@dataclass
+class MapTarget:
+	"""Where and for what the clicks are saved."""
+
+	frame: Frame
+	frame_file: str
+	period: str
+	valid_from: str
+	valid_to: str | None
+	out_path: Path
+	image_size: tuple[int, int]  # (width, height)
+
+
+class HoleClicker:
+	"""The click tool's state (rows of clicked holes, zones, the current row and mode) and its actions."""
+
+	def __init__(self, image: np.ndarray, target: MapTarget, scale: float, channel_axis: str):
+		self.image, self.target, self.scale = image, target, scale
+		self.rows: list[list[Point]] = [[]]
+		self.zones: list[Zone] = []
+		self.notes, self.board_polygon, self.channel_axis = "", None, channel_axis
+		self.row = 0  # always start on row 1, so clicks never land in the last row by accident
+		self.estimated = False
+		self.history: list[tuple[int, Point]] = []  # holes added this session, oldest first: (row, point)
+		self.dirty = False
+		self.warning = ""
+		self.drawing: list[tuple[int, int]] | None = None  # corners of the zone being drawn
+		self.keys = {
+			ord("n"): self.next_row,
+			ord("p"): self.previous_row,
+			ord("e"): self.toggle_estimated,
+			ord("u"): self.undo,
+			ord("d"): self.delete_zone,
+			ord("s"): self.save_key,
+			ord("q"): self.save_and_quit,
+			27: self.save_and_quit,
+			ord("x"): self.quit_without_saving,
+		}
+
+	def load(self, existing: HoleMap) -> None:
+		"""Open an existing map for editing: its holes by row, zones, notes, board outline and channel axis."""
+		self.notes, self.zones, self.board_polygon = existing.notes, list(existing.zones), existing.board_polygon
+		self.channel_axis = existing.channel_axis
+		self.rows = [[] for _ in range(max(h.row for h in existing.holes))] if existing.holes else [[]]
+		for hole in existing.holes:
+			self.rows[hole.row - 1].append((hole.x, hole.y, hole.estimated))
+		print(
+			f"Editing {self.target.out_path}: {len(existing.holes)} holes in {len(self.rows)} rows, "
+			f"{len(self.zones)} zones"
+		)
+
+	def hole_map(self) -> HoleMap:
+		t = self.target
+		holes = number_holes(level_number(t.frame.camera_id), camera_number(t.frame.camera_id), self.rows)
+		return HoleMap(
+			camera_id=t.frame.camera_id,
+			level=level_number(t.frame.camera_id),
+			period=t.period,
+			valid_from=t.valid_from,
+			valid_to=t.valid_to,
+			image_size=t.image_size,
+			reference_file=t.frame_file,
+			holes=holes,
+			board_polygon=self.board_polygon,
+			notes=self.notes,
+			zones=self.zones,
+			channel_axis=self.channel_axis,
+		)
+
+	def save(self) -> None:
+		hole_map = self.hole_map()
+		hole_map.save(self.target.out_path)
+		self.dirty = False
+		rows = sum(1 for r in self.rows if r)
+		print(f"Saved {len(hole_map.holes)} holes in {rows} rows and {len(self.zones)} zones to {self.target.out_path}")
+		problems = (row_problems(hole_map) if hole_map.holes else []) + zone_problems(hole_map)
+		self.warning = f"CHECK: {problems[0]}" if problems else ""
+		for problem in problems:
+			print(f"  WARNING: {problem}")
+
+	# --- mouse
+
+	def on_mouse(self, event: int, mx: int, my: int, _flags, _param) -> None:
+		width, height = self.target.image_size
+		x, y = min(max(mx / self.scale, 0.0), width), min(max(my / self.scale, 0.0), height)
+		if self.drawing is not None:
+			if event == cv2.EVENT_LBUTTONDOWN:
+				self.drawing.append((int(round(x)), int(round(y))))
+			elif event == cv2.EVENT_RBUTTONDOWN and self.drawing:
+				self.drawing.pop()
+		elif event == cv2.EVENT_LBUTTONDOWN:
+			point = (x, y, self.estimated)
+			self.rows[self.row].append(point)
+			self.history.append((self.row, point))
+			self.dirty = True
+		elif event == cv2.EVENT_RBUTTONDOWN:
+			self.delete_nearest(x, y)
+
+	def delete_nearest(self, x: float, y: float) -> None:
+		"""Delete the hole nearest (x, y) within DELETE_RADIUS_PX and switch to its row, so the replacement click
+		lands in the same row (7 Oct: re-placed dots all went into row 1 because the tool stayed on its row)."""
+		best = None
+		for r, row in enumerate(self.rows):
+			for k, (hx, hy, _) in enumerate(row):
+				d = np.hypot(hx - x, hy - y)
+				if d <= DELETE_RADIUS_PX and (best is None or d < best[0]):
+					best = (d, r, k)
+		if best is not None:
+			self.rows[best[1]].pop(best[2])
+			self.row = best[1]
+			self.dirty = True
+
+	# --- keys
+
+	def handle_key(self, key: int) -> str:
+		if key == ord("z"):
+			self.zone_key()
+			return GO
+		if self.drawing is not None:
+			return GO  # while drawing a zone, only z and the mouse do anything
+		action = self.keys.get(key)
+		return action() if action else GO
+
+	def zone_key(self) -> None:
+		"""z starts a zone; z again finishes it (3+ corners) or cancels it."""
+		if self.drawing is None:
+			self.drawing = []
+		elif len(self.drawing) >= 3:
+			self.zones.append(Zone(name=next_zone_name(self.zones), polygon=tuple(self.drawing)))
+			print(f"Added zone '{self.zones[-1].name}' with {len(self.drawing)} corners")
+			self.drawing, self.dirty = None, True
+		else:
+			print("A zone needs at least 3 corners; drawing cancelled.")
+			self.drawing = None
+
+	def next_row(self) -> str:
+		if self.row == len(self.rows) - 1:
+			self.rows.append([])
+		self.row += 1
+		return GO
+
+	def previous_row(self) -> str:
+		self.row = max(0, self.row - 1)
+		return GO
+
+	def toggle_estimated(self) -> str:
+		self.estimated = not self.estimated
+		return GO
+
+	def undo(self) -> str:
+		"""Undo the newest hole added this session: one press per added hole, newest first. If that hole was already
+		deleted with a right click, nothing else is removed (press u again for the one before), and holes loaded from
+		the map are never undone (before 13 Oct, undo removed the last hole of the row, which after a right-click
+		delete could be one of the map's own holes)."""
+		if self.history:
+			row, point = self.history.pop()
+			for k in range(len(self.rows[row]) - 1, -1, -1):
+				if self.rows[row][k] is point:
+					del self.rows[row][k]
+					self.dirty = True
+					break
+		return GO
+
+	def delete_zone(self) -> str:
+		if self.zones:
+			print(f"Deleted zone '{self.zones.pop().name}'")
+			self.dirty = True
+		return GO
+
+	def save_key(self) -> str:
+		self.save()
+		return GO
+
+	def save_and_quit(self) -> str:
+		"""Save and quit; if the save finds new problems, stay open once so they can be fixed (q again quits)."""
+		already_warned = self.warning and not self.dirty
+		self.save()
+		if self.warning and not already_warned:
+			print("  Problems found. Fix them, or press q again to quit anyway.")
+			return AGAIN
+		return STOP
+
+	def quit_without_saving(self) -> str:
+		if self.dirty:
+			print("Quit without saving; unsaved changes discarded.")
+		return STOP
+
+	# --- drawing
+
+	def render(self) -> np.ndarray:
+		canvas = self.draw_zones(self.image.copy())
+		self.draw_holes(canvas)
+		canvas = cv2.resize(canvas, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_LINEAR)
+		self.draw_status(canvas)
+		return canvas
+
+	def draw_zones(self, canvas: np.ndarray) -> np.ndarray:
+		for zone in self.zones:
+			polygon = np.array(zone.polygon, np.int32)
+			shade = canvas.copy()
+			cv2.fillPoly(shade, [polygon], (255, 255, 255))
+			canvas = cv2.addWeighted(canvas, 0.75, shade, 0.25, 0)
+			cv2.polylines(canvas, [polygon], True, (255, 255, 255), 2)
+			corner = tuple(int(v) for v in polygon.min(axis=0) + (6, 18))
+			cv2.putText(canvas, zone.name, corner, cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+		if self.drawing:
+			cv2.polylines(canvas, [np.array(self.drawing, np.int32)], False, (255, 255, 0), 2)
+			for point in self.drawing:
+				cv2.circle(canvas, point, 4, (255, 255, 0), -1)
+		return canvas
+
+	def draw_holes(self, canvas: np.ndarray) -> None:
+		for r, row in enumerate(self.rows):
+			colour = ROW_PALETTE[r % len(ROW_PALETTE)]
+			for k, (x, y, estimated) in enumerate(sorted(row, key=lambda p: p[0]), start=1):
+				centre = (int(round(x)), int(round(y)))
+				cv2.circle(canvas, centre, 6, (0, 0, 0), -1)
+				cv2.circle(canvas, centre, 5, (0, 140, 255) if estimated else colour, -1)
+				if r == self.row and self.drawing is None:
+					cv2.circle(canvas, centre, 9, (255, 255, 255), 1)
+				at = (centre[0] + 7, centre[1] - 7)
+				cv2.putText(canvas, f"R{r + 1}H{k}", at, cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1)
+
+	def draw_status(self, canvas: np.ndarray) -> None:
+		if self.drawing is not None:
+			status = f"DRAWING ZONE: {len(self.drawing)} corners  [left click corner, right click undo, z finish]"
+		else:
+			holes = sum(len(r) for r in self.rows)
+			status = (
+				f"row {self.row + 1}/{len(self.rows)}  holes {holes}  zones {len(self.zones)}  "
+				f"estimated {'ON' if self.estimated else 'off'}  {'*unsaved*' if self.dirty else 'saved'}  "
+				"[n/p row, e est., u undo, z zone, s save, q save+quit, x quit]"
+			)
+		cv2.rectangle(canvas, (0, 0), (canvas.shape[1], 24), (0, 0, 0), -1)
+		cv2.putText(canvas, status, (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+		if self.warning:
+			cv2.rectangle(canvas, (0, 24), (canvas.shape[1], 48), (0, 0, 180), -1)
+			cv2.putText(canvas, self.warning[:150], (8, 41), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+
+
+def run_window(clicker: HoleClicker) -> None:
+	cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
+	cv2.setMouseCallback(WINDOW, clicker.on_mouse)
+	while True:
+		cv2.imshow(WINDOW, clicker.render())
+		outcome = clicker.handle_key(cv2.waitKey(30) & 0xFF)
+		if outcome == STOP:
+			break
+		if outcome == AGAIN:
+			continue
+		if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
+			if clicker.dirty:
+				clicker.save()
+			break
+	cv2.destroyAllWindows()
+
+
 def main() -> None:
 	parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 	parser.add_argument("--frame", type=Path, required=True, help="reference frame to click on")
@@ -93,169 +355,13 @@ def main() -> None:
 	if image is None:
 		raise SystemExit(f"Could not read {args.frame}")
 	height, width = image.shape[:2]
-	level = int(frame.camera_id.split("_")[0].removeprefix("level"))
 	valid_from, valid_to = period_dates(args.periods_csv, frame.camera_id, args.period)
 	out_path = args.out_dir / f"{frame.camera_id}_{args.period}.json"
-
-	rows: list[list[tuple[float, float, bool]]] = [[]]
-	zones: list[Zone] = []
-	notes, board_polygon = "", None
-	channel_axis = args.channel_axis or "row"
+	target = MapTarget(frame, args.frame.name, args.period, valid_from, valid_to, out_path, (width, height))
+	clicker = HoleClicker(image, target, args.scale, args.channel_axis or "row")
 	if out_path.exists():
-		existing = HoleMap.load(out_path)
-		notes, zones, board_polygon = existing.notes, list(existing.zones), existing.board_polygon
-		channel_axis = existing.channel_axis
-		rows = [[] for _ in range(max(h.row for h in existing.holes))] if existing.holes else [[]]
-		for hole in existing.holes:
-			rows[hole.row - 1].append((hole.x, hole.y, hole.estimated))
-		print(f"Editing {out_path}: {len(existing.holes)} holes in {len(rows)} rows, {len(zones)} zones")
-
-	# Always start on row 1, so clicks never land in the last row by accident.
-	state = {"row": 0, "estimated": False, "history": [], "dirty": False, "warning": "", "drawing": None}
-
-	def save() -> None:
-		holes = number_holes(level, camera_number(frame.camera_id), rows)
-		hole_map = HoleMap(
-			camera_id=frame.camera_id,
-			level=level,
-			period=args.period,
-			valid_from=valid_from,
-			valid_to=valid_to,
-			image_size=(width, height),
-			reference_file=args.frame.name,
-			holes=holes,
-			board_polygon=board_polygon,
-			notes=notes,
-			zones=zones,
-			channel_axis=channel_axis,
-		)
-		hole_map.save(out_path)
-		state["dirty"] = False
-		print(f"Saved {len(holes)} holes in {sum(1 for r in rows if r)} rows and {len(zones)} zones to {out_path}")
-		problems = (row_problems(hole_map) if holes else []) + zone_problems(hole_map)
-		state["warning"] = f"CHECK: {problems[0]}" if problems else ""
-		for problem in problems:
-			print(f"  WARNING: {problem}")
-
-	def on_mouse(event, mx, my, _flags, _param) -> None:
-		x, y = mx / args.scale, my / args.scale
-		x, y = min(max(x, 0.0), width), min(max(y, 0.0), height)
-		if state["drawing"] is not None:
-			if event == cv2.EVENT_LBUTTONDOWN:
-				state["drawing"].append((int(round(x)), int(round(y))))
-			elif event == cv2.EVENT_RBUTTONDOWN and state["drawing"]:
-				state["drawing"].pop()
-			return
-		if event == cv2.EVENT_LBUTTONDOWN:
-			rows[state["row"]].append((x, y, state["estimated"]))
-			state["history"].append(state["row"])
-			state["dirty"] = True
-		elif event == cv2.EVENT_RBUTTONDOWN:
-			best = None
-			for r, row in enumerate(rows):
-				for k, (hx, hy, _) in enumerate(row):
-					d = np.hypot(hx - x, hy - y)
-					if d <= DELETE_RADIUS_PX and (best is None or d < best[0]):
-						best = (d, r, k)
-			if best is not None:
-				rows[best[1]].pop(best[2])
-				# switch to that row, so the replacement click lands in the same row (7 Oct: re-placed
-				# dots all went into row 1 because the tool stayed on the row it opened on)
-				state["row"] = best[1]
-				state["dirty"] = True
-
-	def render() -> np.ndarray:
-		canvas = image.copy()
-		for zone in zones:
-			polygon = np.array(zone.polygon, np.int32)
-			shade = canvas.copy()
-			cv2.fillPoly(shade, [polygon], (255, 255, 255))
-			canvas = cv2.addWeighted(canvas, 0.75, shade, 0.25, 0)
-			cv2.polylines(canvas, [polygon], True, (255, 255, 255), 2)
-			corner = tuple(int(v) for v in polygon.min(axis=0) + (6, 18))
-			cv2.putText(canvas, zone.name, corner, cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-		if state["drawing"]:
-			points = np.array(state["drawing"], np.int32)
-			cv2.polylines(canvas, [points], False, (255, 255, 0), 2)
-			for point in state["drawing"]:
-				cv2.circle(canvas, point, 4, (255, 255, 0), -1)
-		for r, row in enumerate(rows):
-			colour = ROW_COLOURS[r % len(ROW_COLOURS)]
-			for k, (x, y, estimated) in enumerate(sorted(row, key=lambda p: p[0]), start=1):
-				centre = (int(round(x)), int(round(y)))
-				cv2.circle(canvas, centre, 6, (0, 0, 0), -1)
-				cv2.circle(canvas, centre, 5, (0, 140, 255) if estimated else colour, -1)
-				if r == state["row"] and state["drawing"] is None:
-					cv2.circle(canvas, centre, 9, (255, 255, 255), 1)
-				at = (centre[0] + 7, centre[1] - 7)
-				cv2.putText(canvas, f"R{r + 1}H{k}", at, cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1)
-		canvas = cv2.resize(canvas, None, fx=args.scale, fy=args.scale, interpolation=cv2.INTER_LINEAR)
-		if state["drawing"] is not None:
-			status = f"DRAWING ZONE: {len(state['drawing'])} corners  [left click corner, right click undo, z finish]"
-		else:
-			status = (
-				f"row {state['row'] + 1}/{len(rows)}  holes {sum(len(r) for r in rows)}  zones {len(zones)}  "
-				f"estimated {'ON' if state['estimated'] else 'off'}  {'*unsaved*' if state['dirty'] else 'saved'}  "
-				"[n/p row, e est., u undo, z zone, s save, q save+quit, x quit]"
-			)
-		cv2.rectangle(canvas, (0, 0), (canvas.shape[1], 24), (0, 0, 0), -1)
-		cv2.putText(canvas, status, (8, 17), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-		if state["warning"]:
-			cv2.rectangle(canvas, (0, 24), (canvas.shape[1], 48), (0, 0, 180), -1)
-			cv2.putText(canvas, state["warning"][:150], (8, 41), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-		return canvas
-
-	cv2.namedWindow(WINDOW, cv2.WINDOW_AUTOSIZE)
-	cv2.setMouseCallback(WINDOW, on_mouse)
-	while True:
-		cv2.imshow(WINDOW, render())
-		key = cv2.waitKey(30) & 0xFF
-		if key == ord("z"):
-			if state["drawing"] is None:
-				state["drawing"] = []
-			elif len(state["drawing"]) >= 3:
-				zones.append(Zone(name=next_zone_name(zones), polygon=tuple(state["drawing"])))
-				print(f"Added zone '{zones[-1].name}' with {len(state['drawing'])} corners")
-				state["drawing"], state["dirty"] = None, True
-			else:
-				print("A zone needs at least 3 corners; drawing cancelled.")
-				state["drawing"] = None
-		elif state["drawing"] is not None:
-			pass  # while drawing a zone, only z and the mouse do anything
-		elif key == ord("n"):
-			if state["row"] == len(rows) - 1:
-				rows.append([])
-			state["row"] += 1
-		elif key == ord("p"):
-			state["row"] = max(0, state["row"] - 1)
-		elif key == ord("e"):
-			state["estimated"] = not state["estimated"]
-		elif key == ord("u") and state["history"]:
-			row = state["history"].pop()
-			if rows[row]:
-				rows[row].pop()
-				state["dirty"] = True
-		elif key == ord("d") and zones:
-			print(f"Deleted zone '{zones.pop().name}'")
-			state["dirty"] = True
-		elif key == ord("s"):
-			save()
-		elif key in (ord("q"), 27):
-			already_warned = state["warning"] and not state["dirty"]
-			save()
-			if state["warning"] and not already_warned:
-				print("  Problems found. Fix them, or press q again to quit anyway.")
-				continue
-			break
-		elif key == ord("x"):
-			if state["dirty"]:
-				print("Quit without saving; unsaved changes discarded.")
-			break
-		if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:
-			if state["dirty"]:
-				save()
-			break
-	cv2.destroyAllWindows()
+		clicker.load(HoleMap.load(out_path))
+	run_window(clicker)
 
 
 if __name__ == "__main__":
