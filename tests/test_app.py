@@ -5,6 +5,7 @@ from main import app
 
 # TODO: Test authorized user, using credentials from environment variables
 
+
 # --- Root & Smoke Test ---
 @pytest.mark.asyncio
 async def test_app():

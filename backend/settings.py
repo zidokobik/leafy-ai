@@ -39,6 +39,12 @@ class Settings(BaseSettings):
 	# Implicit TLS (port 465). When false, STARTTLS is negotiated if the server offers it.
 	SMTP_USE_TLS: bool = False
 
+	# Computer vision output folder (one <camera>_<period>/overlays/ per hole map), served on the Crowding page.
+	# Relative to the folder the API is started from; the files are git-ignored, copied from the CV laptop.
+	CV_RUNS_DIR: str = "cv/data/runs"
+	# Clock of the camera frame names and Level 2 move/harvest times (not confirmed; La Trobe, Melbourne).
+	FARM_TIMEZONE: str = "Australia/Melbourne"
+
 	model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

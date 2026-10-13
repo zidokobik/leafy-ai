@@ -11,6 +11,7 @@ import {
 import { AppShell } from "./components/AppShell";
 import { AgentsPage } from "./features/agents/AgentsPage";
 import { AlertsPage } from "./features/alerts/AlertsPage";
+import { PlantsPage } from "./features/plants/PlantsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { useAuth } from "./features/auth/useAuth";
 import { DevicesPage } from "./features/devices/DevicesPage";
@@ -86,6 +87,7 @@ export default function App() {
         >
           <Route index element={<OverviewPage />} />
           <Route path="alerts" element={<AlertsPage />} />
+          <Route path="plants" element={<PlantsPage />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="schedules" element={<SchedulesPage />} />
           <Route path="devices" element={<DevicesPage />} />

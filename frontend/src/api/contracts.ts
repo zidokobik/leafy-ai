@@ -60,3 +60,60 @@ export type ChatConversationSummary = {
 export type ChatConversationDetail = ChatConversationSummary & {
   messages: UIMessage[]
 }
+
+export type PlantStatus = 'empty' | 'growing' | 'candidate' | 'ready' | 'uncertain'
+
+/** expand_channel = touching in the same channel; check_spacing = touching the next channel. */
+export type GrowerAction = 'expand_channel' | 'check_spacing' | 'check_canopy'
+
+/** One `ready` hole or canopy zone. Contacts are null when not measurable (never 0). */
+export type PlantRecommendation = {
+  holeId: string
+  action: GrowerAction
+  message: string
+  row: number | null
+  col: number | null
+  contactAlong: number | null
+  contactAcross: number | null
+  confirmedFrames: number
+}
+
+/** One camera's frame. `capturedAt` is farm local time without a timezone. */
+export type CameraReadiness = {
+  cameraId: string
+  period: string
+  capturedAt: string
+  imageId: string
+  statusCounts: Partial<Record<PlantStatus, number>>
+  recommendations: PlantRecommendation[]
+}
+
+export type HarvestStatus = 'growing' | 'harvest_tomorrow' | 'harvest_due' | 'harvested'
+
+/** A batch moved from Level 1 to Level 2; times are farm local time without a timezone. */
+export type BatchHarvest = {
+  batchId: number
+  movedAt: string
+  dueAt: string
+  harvestedAt: string | null
+  daysOnLevel2: number
+  status: HarvestStatus
+  message: string
+  note: string
+}
+
+export type HarvestReadiness = {
+  asOf: string
+  batches: BatchHarvest[]
+  summary: string
+  limitations: string
+}
+
+export type PlantReadiness = {
+  level: number
+  asOf: string | null
+  modelVersion: string | null
+  cameras: CameraReadiness[]
+  summary: string
+  limitations: string
+}

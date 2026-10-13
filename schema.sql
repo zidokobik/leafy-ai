@@ -169,3 +169,46 @@ CREATE TABLE public.chat_messages (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT chat_messages_conversation_seq_unique UNIQUE (conversation_id, seq)
 );
+
+-- CV results: one row per camera frame x planting hole (kind 'hole') or canopy zone
+-- (kind 'zone'), loaded from cv/data/runs/*/observations.csv. Insert-only: a CV fix
+-- comes with a new model_version. captured_at is farm local time from the file name.
+CREATE TABLE public.plant_observations (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  image_id text NOT NULL,
+  model_version text NOT NULL,
+  camera_id text NOT NULL,
+  captured_at timestamp NOT NULL,
+  level smallint NOT NULL,
+  period text NOT NULL,
+  hole_id text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('hole', 'zone')),
+  row smallint,
+  col smallint,
+  in_frame real,
+  occupied boolean NOT NULL,
+  coverage real NOT NULL CHECK (coverage BETWEEN 0 AND 1),
+  boundary_contact real CHECK (boundary_contact BETWEEN 0 AND 1),
+  contact_along real CHECK (contact_along BETWEEN 0 AND 1),
+  contact_across real CHECK (contact_across BETWEEN 0 AND 1),
+  plant_area_px integer,
+  status text NOT NULL CHECK (status IN ('empty', 'growing', 'candidate', 'ready', 'uncertain')),
+  confirmed_frames smallint NOT NULL,
+  flags text[] NOT NULL DEFAULT '{}',
+  CONSTRAINT plant_observations_unique UNIQUE (image_id, hole_id, model_version)
+);
+CREATE INDEX plant_observations_camera_time_idx ON public.plant_observations (camera_id, captured_at DESC);
+
+-- Batches of plants moved from Level 1 to Level 2. Harvest is due 7 days after the move (the
+-- owner's rule), so these dates drive the harvest recommendation, not the camera. Times are farm
+-- local time like plant_observations.captured_at; harvested_at stays NULL until the harvest.
+CREATE TABLE public.level2_batches (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  moved_at timestamp NOT NULL UNIQUE,
+  harvested_at timestamp CHECK (harvested_at IS NULL OR harvested_at >= moved_at),
+  note text NOT NULL DEFAULT ''
+);
+-- The two moves in the archived camera frames (cv/data/periods.csv, level2_camera2 P2 and P5).
+INSERT INTO public.level2_batches (moved_at, harvested_at, note) VALUES
+  ('2026-09-30 11:00:27', '2026-10-07 17:00:36', 'Level 1 canopy moved up 30 Sep; harvested 7 Oct (frames)'),
+  ('2026-10-08 16:00:30', NULL, 'Crowded Level 1 plants moved up 8 Oct (new Level 1 layout the same hour)');
