@@ -20,7 +20,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
 	messages, approvals = ai.ui.ai_sdk.to_messages(request.messages)
 
 	return StreamingResponse(
-		stream_chat_response(messages, approvals, conversation_id=request.id),
+		stream_chat_response(messages, approvals, conversation_id=request.id, detail=request.detail),
 		headers=ai.ui.ai_sdk.UI_MESSAGE_STREAM_HEADERS,
 	)
 
