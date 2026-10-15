@@ -1,0 +1,38 @@
+[project]
+name = "leafy-cv"
+version = "0.1.0"
+description = "Computer vision worker for Leafy AI: frame indexing, camera-movement checks and per-hole plant metrics"
+readme = "README.md"
+requires-python = ">=3.12"
+# Licences: only MIT / BSD / Apache-2.0 (possible commercialisation). No Ultralytics packages.
+dependencies = [
+    "numpy>=2.0",  # BSD-3
+    "opencv-python>=4.10",  # Apache-2.0
+    "scikit-learn>=1.5",  # BSD-3, plant filter training
+    "torch>=2.4",  # BSD-3; the PyPI wheel on Windows is CPU-only
+    "torchvision>=0.19",  # BSD-3
+    "timm>=1.0",  # Apache-2.0, MobileSAM's image encoder
+    # Apache-2.0. Not on PyPI, so pinned to a commit of the official repo.
+    "mobile-sam @ git+https://github.com/ChaoningZhang/MobileSAM.git@f706ad9c4eb7f219c00d9050e46328518ffb65d2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/leafy_cv"]
+
+# Same settings as the repo root (kept here so cv/ also lints on its own)
+[tool.ruff]
+line-length = 120
+src = ["src"]  # leafy_cv is our own package (import sorting)
+
+[tool.ruff.format]
+indent-style = "tab"

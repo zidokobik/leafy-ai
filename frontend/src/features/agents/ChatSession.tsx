@@ -36,9 +36,13 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AssistantParts } from "./MessageParts";
 
 const suggestions = ["Summarize the latest 24 hours sensor data"];
+
+/** Answer style sent with every request; the backend tells the agent which format to use. */
+type AnswerDetail = "simple" | "detailed";
 
 const transport = new DefaultChatTransport({
   api: `${apiConfig.baseUrl}/api/v1/chat`,
@@ -61,6 +65,8 @@ export function ChatSession({
   onResponseFinished,
 }: ChatSessionProps) {
   const [input, setInput] = useState("");
+  const [detail, setDetail] = useState<AnswerDetail>("simple");
+  const requestOptions = { body: { detail } };
   const { messages, sendMessage, status, error, stop, regenerate } = useChat({
     id: conversationId,
     messages: initialMessages,
@@ -87,7 +93,7 @@ export function ChatSession({
     event.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || isBusy) return;
-    void sendMessage({ text: trimmed });
+    void sendMessage({ text: trimmed }, requestOptions);
     setInput("");
   };
 
@@ -117,7 +123,9 @@ export function ChatSession({
                         variant="outline"
                         size="sm"
                         disabled={isBusy}
-                        onClick={() => void sendMessage({ text: suggestion })}
+                        onClick={() =>
+                          void sendMessage({ text: suggestion }, requestOptions)
+                        }
                       >
                         {suggestion}
                       </Button>
@@ -199,7 +207,7 @@ export function ChatSession({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void regenerate()}
+              onClick={() => void regenerate(requestOptions)}
             >
               <RefreshCwIcon /> Retry
             </Button>
@@ -218,6 +226,23 @@ export function ChatSession({
           onSubmit={submit}
           className="flex shrink-0 items-center gap-2 border-t border-border p-3"
         >
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={detail}
+            onValueChange={(value) => {
+              if (value) setDetail(value as AnswerDetail);
+            }}
+            aria-label="Answer style"
+          >
+            <ToggleGroupItem value="simple" title="Short answers (default)">
+              Simple
+            </ToggleGroupItem>
+            <ToggleGroupItem value="detailed" title="Full answers with all values and reasoning">
+              Detailed
+            </ToggleGroupItem>
+          </ToggleGroup>
           <Input
             value={input}
             onChange={(event) => setInput(event.target.value)}

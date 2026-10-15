@@ -7,10 +7,11 @@ import ai.ui.ai_sdk
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.dependencies.database_session import get_engine
+from backend.schemas.chat import AnswerDetail
 from backend.services import chat_history
 from backend.settings import get_settings
 
-from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors
+from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors, harvest_readiness,plant_readiness, proposals,
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
@@ -28,6 +29,8 @@ def build_agent(*, schedule_id: UUID | None = None) -> ai.Agent:
 		tools=[
 			miscelaneous.get_unix_timestamp,
 			sensors.get_sensor_history,
+			plant_readiness.get_plant_readiness,
+			harvest_readiness.get_harvest_readiness,
 			camera.list_cameras,
 			camera.get_camera_image,
 			alerts.list_alerts,
@@ -46,17 +49,19 @@ async def stream_chat_response(
 	messages: list[ai.messages.Message],
 	approvals: list[ai.ui.ai_sdk.ApprovalResponse] | None = None,
 	conversation_id: UUID | None = None,
+	detail: AnswerDetail = "simple",
 ) -> AsyncIterator[str]:
 	"""Run the chat agent over the given UI messages, yielding AI SDK UI SSE chunks.
 
 	When `conversation_id` is given, the full run history is persisted after the
-	stream completes, creating the conversation on first use.
+	stream completes, creating the conversation on first use. `detail` picks the
+	answer style described in the system prompt.
 	"""
 	# See: https://ai-python.dev/docs/basics/ai-sdk-ui#tool-approvals
 	if approvals is None:
 		approvals = []
 
-	messages.insert(0, ai.system_message(SYSTEM_PROMPT))
+	messages.insert(0, ai.system_message(f"{SYSTEM_PROMPT}\n\nAnswer style for this reply: {detail}."))
 
 	settings = get_settings()
 

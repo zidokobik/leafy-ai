@@ -1,0 +1,11 @@
+# Generated outputs (runs, overlays, checks, backups) stay out of git; they can be recreated with tools/.
+# Kept: the frame index and periods, hand-corrected on 11 Oct 2026 (some period boundaries set by inspection); the tools cannot recreate them
+# and tools/run.py needs frame_index.csv.
+data/*
+!data/frame_index.csv
+!data/periods.csv
+# MobileSAM weights (40 MB): tools/download_weights.py fetches them.
+models/
+# Working notes (progress log and handover), kept on the laptop only, not part of the submitted code.
+HANDOVER.md
+PROGRESS.md

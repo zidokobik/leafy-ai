@@ -1,6 +1,18 @@
 from fastapi import APIRouter
 
-from backend.router import alerts, auth, camera, chat, devices, notifications, proposals, schedules, sensors, users
+from backend.router import (
+	alerts,
+	auth,
+	camera,
+	chat,devices,
+	harvest_readiness,
+	notifications,
+	plant_readiness,
+	proposals,
+	schedules,
+	sensors,
+	users,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -15,3 +27,5 @@ router.include_router(devices.powerboards_router)
 router.include_router(proposals.router)
 router.include_router(alerts.router)
 router.include_router(notifications.router)
+router.include_router(plant_readiness.router)
+router.include_router(harvest_readiness.router)

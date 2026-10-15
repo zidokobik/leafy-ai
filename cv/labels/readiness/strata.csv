@@ -1,0 +1,12 @@
+camera_id,status,hole_days_available,picked
+level1_camera1,candidate,28,12
+level1_camera1,growing,63,32
+level1_camera1,ready,48,32
+level1_camera2,candidate,131,12
+level1_camera2,empty,38,6
+level1_camera2,growing,388,32
+level1_camera2,ready,509,32
+level1_camera3,candidate,97,12
+level1_camera3,empty,3,3
+level1_camera3,growing,107,32
+level1_camera3,ready,164,32

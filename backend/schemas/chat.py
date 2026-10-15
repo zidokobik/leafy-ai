@@ -6,12 +6,15 @@ import ai.ui.ai_sdk
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+AnswerDetail = Literal["simple", "detailed"]
+
 
 class ChatRequest(BaseModel):
-	"""AI SDK UI chat request; `id` identifies the persisted conversation."""
+	"""AI SDK UI chat request; `id` identifies the persisted conversation, `detail` the answer style."""
 
 	id: uuid.UUID
 	messages: list[ai.ui.ai_sdk.UIMessage]
+	detail: AnswerDetail = "simple"
 
 
 class ChatConversationSummary(BaseModel):

@@ -8,7 +8,7 @@ const capturedTime = new Intl.DateTimeFormat(undefined, {
   day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
 })
 
-function CameraCard({ camera }: { camera: CameraImage }) {
+export function CameraCard({ camera }: { camera: CameraImage }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
       {camera.imageUrl ? (

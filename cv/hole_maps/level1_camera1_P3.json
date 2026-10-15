@@ -1,0 +1,177 @@
+{
+  "camera_id": "level1_camera1",
+  "level": 1,
+  "period": "P3",
+  "valid_from": "2026-09-30T11:00:23",
+  "valid_to": null,
+  "image_size": [
+    704,
+    576
+  ],
+  "reference_file": "level1_camera1_20260930_110023.jpg",
+  "holes": [
+    {
+      "hole_id": "L1-C1-R01-H01",
+      "x": 42.7,
+      "y": 378.7,
+      "row": 1,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R01-H02",
+      "x": 126.7,
+      "y": 404.0,
+      "row": 1,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R01-H03",
+      "x": 244.7,
+      "y": 425.3,
+      "row": 1,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R01-H04",
+      "x": 395.0,
+      "y": 445.0,
+      "row": 1,
+      "col": 4,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C1-R01-H05",
+      "x": 525.0,
+      "y": 450.0,
+      "row": 1,
+      "col": 5,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C1-R01-H06",
+      "x": 630.0,
+      "y": 435.0,
+      "row": 1,
+      "col": 6,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C1-R01-H07",
+      "x": 695.0,
+      "y": 410.0,
+      "row": 1,
+      "col": 7,
+      "estimated": true
+    },
+    {
+      "hole_id": "L1-C1-R02-H01",
+      "x": 24.0,
+      "y": 460.0,
+      "row": 2,
+      "col": 1,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R02-H02",
+      "x": 110.7,
+      "y": 484.0,
+      "row": 2,
+      "col": 2,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R02-H03",
+      "x": 226.7,
+      "y": 508.7,
+      "row": 2,
+      "col": 3,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R02-H04",
+      "x": 405.3,
+      "y": 522.0,
+      "row": 2,
+      "col": 4,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R02-H05",
+      "x": 542.0,
+      "y": 522.0,
+      "row": 2,
+      "col": 5,
+      "estimated": false
+    },
+    {
+      "hole_id": "L1-C1-R02-H06",
+      "x": 649.3,
+      "y": 514.0,
+      "row": 2,
+      "col": 6,
+      "estimated": false
+    }
+  ],
+  "board_polygon": null,
+  "notes": "Drafted by Claude 5 Oct; corrected by Pearl 7 Oct (re-clicked row 1 H01-H03 and row 2 bases). Three old draft row-2 dots that sat on the same plants as her new dots (240,560 / 400,548 / 540,530) were removed by Claude on 7 Oct; her saved file is in data/backup/level1_camera1_P3.clicked_7oct.json. Row 1 H04-H07 stay estimated (bases hidden by leaves). Layout from 30 Sep 11:00 (camera 1 not moved). Rows are channels, numbered by distance from camera 1: row 1 = farthest mapped, row 2 = nearest. Row 1 bases are estimated from where each plant column ends (orange). Everything beyond row 1 is zone dense_far. Camera 2 sees the same board from the other end; its far rows are camera 1's near rows.",
+  "zones": [
+    {
+      "name": "dense_far",
+      "polygon": [
+        [
+          20,
+          165
+        ],
+        [
+          90,
+          62
+        ],
+        [
+          300,
+          28
+        ],
+        [
+          520,
+          32
+        ],
+        [
+          650,
+          92
+        ],
+        [
+          704,
+          150
+        ],
+        [
+          704,
+          385
+        ],
+        [
+          600,
+          405
+        ],
+        [
+          450,
+          415
+        ],
+        [
+          300,
+          395
+        ],
+        [
+          150,
+          375
+        ],
+        [
+          30,
+          355
+        ]
+      ],
+      "kind": "canopy",
+      "note": "Rows beyond row 1: plants overlap along camera 1's line of sight, so bases can't be placed. Measured as closure. DRAFT outline."
+    }
+  ]
+}
