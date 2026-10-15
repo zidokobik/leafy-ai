@@ -95,7 +95,7 @@ def test_gap_corridors_link_both_directions():
 	cells = build_cells(grid_map())  # channel_axis "row": each row is a channel
 	corridor = cells.corridors[0]  # top-left hole at (60, 60); same-channel neighbour right, next channel below
 	assert corridor[80, 60]  # towards the hole below, in the next channel
-	assert corridor[60, 80]  # towards the right neighbour in the same channel: expansion separates them (12 Oct)
+	assert corridor[60, 80]  # towards the right neighbour in the same channel: expansion separates them
 	assert not corridor[60, 40]  # outer side, no neighbour there
 	assert cells.neighbours[0] == {1, 3} and cells.cross_neighbours[0] == {3} and cells.along_neighbours[0] == {1}
 	assert cells.pair_direction[(0, 3)] == ACROSS and cells.pair_direction[(0, 1)] == ALONG
@@ -147,7 +147,7 @@ def test_a_missing_hole_does_not_pair_the_plants_on_either_side_of_it():
 
 def test_perspective_along_a_column_channel_keeps_every_pair():
 	# camera 3: channels are columns running away from the camera; spacing grows towards the camera
-	# (camera 3 P4 channel 2, 12 Oct: gaps 23, 23, 37, 41, 67, 97 px; 1.6x the gap before it, but not the one after)
+	# (camera 3 P4 channel 2: gaps 23, 23, 37, 41, 67, 97 px; 1.6x the gap before it, but not the one after)
 	ys = list(np.cumsum([20, 23, 23, 37, 41, 67, 97]))
 	hole_map = channel_map([ys, ys, ys], axis="col")
 	cells = build_cells(hole_map)
@@ -231,7 +231,7 @@ def test_row_check_accepts_curved_rows():
 
 
 def test_row_check_flags_holes_clicked_into_the_wrong_row():
-	# 30 Sep: new clicks from three rows all landed in the last row (nearest the camera)
+	# new clicks from three rows all landed in the last row (nearest the camera)
 	rows = [
 		[(x, 100, False) for x in range(50, 700, 75)],
 		[(x, 500, False) for x in range(50, 700, 75)] + [(x + 30, 100 + 50, False) for x in range(50, 700, 150)],

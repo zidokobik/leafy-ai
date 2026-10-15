@@ -1,7 +1,7 @@
 """tools/run.py end to end on a tiny made-up map, with a fake measurement in place of MobileSAM.
 
-From the independent review (8 Oct): an interrupted run with other settings must not leave its plant
-pixels under the old numbers; --limit must not delete cached rows; a map without pairs must not crash.
+An interrupted run with other settings must not leave its plant pixels under the old numbers; --limit must not
+delete cached rows; a map without pairs must not crash.
 """
 
 import csv
@@ -120,7 +120,7 @@ def test_pixels_made_with_other_settings_are_refused(run, tmp_path):
 	assert run.load_plant_pixels(path, "settings-a", W).all()
 	with pytest.raises(ValueError):
 		run.load_plant_pixels(path, "settings-b", W)
-	np.savez_compressed(path, plant=np.zeros(3, np.uint8))  # unstamped (made before 8 Oct)
+	np.savez_compressed(path, plant=np.zeros(3, np.uint8))  # unstamped (made before pixel files were stamped)
 	assert run.plant_pixels_made_with(path) is None
 	assert run.plant_pixels_made_with(tmp_path / "missing.npz") is None
 
@@ -178,6 +178,18 @@ def test_a_new_layout_without_a_map_is_reported_and_never_measured_with_the_old_
 	assert {o["image_id"] for o in read(tmp_path, "observations.csv")} == {f"f{k}.jpg" for k in range(FRAMES)}
 	(tmp_path / "level1_camera2_P3.json").write_text("{}")  # once the new layout has its map: no problem
 	assert go(run, tmp_path, FakeMeasure(), "aaaa") == []
+
+
+def test_a_map_that_fails_its_own_checks_is_not_run(run, tmp_path):
+	setup(tmp_path)
+	broken = HoleMap.load(tmp_path / "map.json")
+	first = broken.holes[0]
+	broken.holes[1] = Hole(broken.holes[1].hole_id, first.x + 1, first.y, first.row, 2)  # the same hole clicked twice
+	broken.save(tmp_path / "map.json")
+	measure = FakeMeasure()
+	problems = go(run, tmp_path, measure, "aaaa")
+	assert len(problems) == 1 and "clicked twice" in problems[0] and "Not run" in problems[0]
+	assert measure.calls == 0 and not (tmp_path / "out" / "level1_camera2_P2").exists()
 
 
 def test_a_normal_run_has_no_problems(run, tmp_path):

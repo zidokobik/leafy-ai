@@ -1,14 +1,13 @@
 """Pick hole crops for us to label "crowded or not", to check the frozen readiness rule.
 
-There is no grower round (decided 7 Oct), so we label against the written rule ourselves:
+There is no grower round, so we label against the written rule ourselves:
 "do this plant's leaves touch the leaves of any neighbouring plant, in the same channel or the next channel?"
-(12 Oct: both directions. Crops drawn with the 7 Oct statuses, which counted the next channel only, must not be
-reused: make new ones from the rerun.)
+Crops must be drawn from statuses made with the current rule.
 
 Usage (from the cv/ folder, after tools/run.py has run on the maps):
 	uv run python tools/make_hole_items.py
 
-Sampling (agreed 11 Oct, before any labels exist): stratified by camera x CV status, so every camera gets
+Sampling (agreed before any labels existed): stratified by camera x CV status, so every camera gets
 enough of each status and is reported on its own:
 - quotas per camera: ready 32, growing 32, candidate 12, empty 6 (fewer when a camera has fewer);
 - 8 ready and 4 growing camera 2 crops from the first two days after the 30 Sep transfer (30 Sep 11:00 - 1 Oct),

@@ -1,4 +1,5 @@
-"""Writing the CSV outputs: one way for every tool (each used to write its own, not all of them safely)."""
+"""Writing and reading the CSV outputs. Every CSV is written through write_csv, so an interrupted write never leaves a
+half-written file."""
 
 import csv
 from collections.abc import Iterator, Sequence

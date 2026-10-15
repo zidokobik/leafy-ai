@@ -8,10 +8,9 @@ centres we build, in pixels of that camera's frames:
   Cells shrink with distance exactly like the plants do, so ratios measured inside a cell
   (coverage) can be compared across near and far holes.
 - **neighbours**: two holes are neighbours when their cells touch.
-- **plant pairs** whose gap is judged for crowding, in both directions (12 Oct, Pearl: channel expansion
-  separates the plants *in the same channel*, and touching the next channel matters too, since plants
-  keep some distance from the next channel when they go to Level 2). The 7 Oct version paired only
-  across channels, from a misunderstanding of how expansion works; corrected 12 Oct.
+- **plant pairs** whose gap is judged for crowding, in both directions: channel expansion separates the
+  plants *in the same channel*, and touching the next channel matters too, since plants keep some distance
+  from the next channel when they go to Level 2.
   - **same-channel pairs** ("along"): each hole and the next hole along its channel (`same_channel_pairs`).
     A pair is skipped when its gap is far longer than the channel's gaps next to it (a hole missing from
     the map would otherwise pair two plants that aren't neighbours).
@@ -66,8 +65,8 @@ ALONG, ACROSS = Direction.ALONG, Direction.ACROSS
 # Same-channel pairs: a gap longer than this x every adjacent gap in its channel is skipped (a hole missing
 # from the map). Compared with the adjacent gaps, not the channel's median, because perspective makes the
 # spacing change along a channel: camera 3's channels run 21-104 px, its nearest gaps 1.5-2.5x the median,
-# adjacent gaps differ by up to 1.65x on one side but never on both (12 Oct, all four maps: no real pair
-# is skipped). A missing hole doubles a gap against both neighbours.
+# adjacent gaps differ by up to 1.65x on one side but never on both (on all four maps no real pair is
+# skipped). A missing hole doubles a gap against both neighbours.
 MAX_ALONG_GAP_VS_ADJACENT = 1.6
 # Cross-channel neighbours: in each adjacent channel, the nearest hole plus any other within this factor of
 # it that also faces this hole (offset along the channel under FACING_OFFSET x the along-channel spacing),
@@ -76,7 +75,7 @@ CROSS_NEIGHBOUR_FACTOR = 1.35
 FACING_OFFSET = 0.75
 # ... and none further than this factor x the hole's own along-channel spacing, so the end of a short row
 # doesn't pair with a hole diagonally across the board. Local, because perspective makes near rows wider
-# apart than far ones (measured 7 Oct: cross / along spacing 0.5-1.9 on all four maps).
+# apart than far ones (measured on all four maps: cross / along spacing 0.5-1.9).
 MAX_CROSS_VS_ALONG = 2.5
 MIN_HOLES = 3
 # A row's holes lie on one smooth curve (straight, or bent by the fisheye lens). A hole further
@@ -602,7 +601,7 @@ def draw_overlay(image_bgr: np.ndarray, hole_map: HoleMap, cells: Cells) -> np.n
 	out[edges > 0] = (255, 255, 255)
 
 	for i, hole in enumerate(hole_map.holes):
-		centre = (int(round(hole.x)), int(round(hole.y)))
+		centre = (round(hole.x), round(hole.y))
 		cv2.circle(out, centre, 4, (0, 0, 0), -1)
 		cv2.circle(out, centre, 3, (0, 255, 255) if not hole.estimated else (0, 140, 255), -1)
 		if not cells.reliable[i]:

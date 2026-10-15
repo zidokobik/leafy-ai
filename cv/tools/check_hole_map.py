@@ -50,7 +50,7 @@ def map_checks(hole_map: HoleMap, cells: Cells) -> list[Check]:
 	neighbour_counts = np.array([len(n) for n in cells.neighbours])
 	vs_expected = areas / cells.spacing**2
 	oversized = [h.hole_id for h, r in zip(hole_map.holes, vs_expected, strict=True) if r > MAX_AREA_VS_EXPECTED]
-	own_cell = [cells.labels[int(round(h.y)), int(round(h.x))] == i for i, h in enumerate(hole_map.holes)]
+	own_cell = [cells.labels[round(h.y), round(h.x)] == i for i, h in enumerate(hole_map.holes)]
 	problems = row_problems(hole_map)
 	bad_zones = zone_problems(hole_map)
 	return [

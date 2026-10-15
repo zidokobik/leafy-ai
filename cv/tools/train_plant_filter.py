@@ -26,6 +26,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from leafy_cv.drawing import dim_outside, put_outlined_text
+from leafy_cv.labelling import PlantLabel
 from leafy_cv.plant_filter import FEATURE_NAMES, PlantFilter, mask_features, unpack_masks
 
 MIN_LABELS = 100
@@ -33,8 +34,8 @@ FOLDS = 5
 ERROR_TILES = 24
 
 
-# C=10 (light regularisation) was chosen on 5 Oct by the same grouped cross-validation, using
-# Pearl's 632 labels: 97.4% vs 96.5% at C=1, with the biggest gain on camera 2's pale pink-lit
+# C=10 (light regularisation) was chosen by the same grouped cross-validation, on the 632 hand
+# labels: 97.4% vs 96.5% at C=1, with the biggest gain on camera 2's pale pink-lit
 # leaves. Pairwise features (98.3%) and a random forest (98.1%) were not worth the complexity.
 C = 10.0
 
@@ -74,10 +75,10 @@ def read_answers(labels_dir: Path) -> tuple[dict[str, dict], list[dict]]:
 		answers = list(csv.DictReader(handle))
 	counts = Counter(a["label"] for a in answers)
 	print(f"{len(answers)} answers: " + ", ".join(f"{k} {v}" for k, v in counts.most_common()))
-	used = [a for a in answers if a["label"] in ("plant", "not_plant")]
+	used = [a for a in answers if a["label"] in (PlantLabel.PLANT, PlantLabel.NOT_PLANT)]
 	if len(used) < MIN_LABELS:
 		raise SystemExit(f"Need at least {MIN_LABELS} plant / not plant answers; have {len(used)}.")
-	if counts["mixed"] / max(len(answers), 1) > 0.15:
+	if counts[PlantLabel.MIXED] / max(len(answers), 1) > 0.15:
 		print("  Note: over 15% mixed. MobileSAM often outlines plant and board together; check the prompts.")
 	return candidates, used
 
@@ -146,7 +147,7 @@ def main() -> None:
 
 	candidates, used = read_answers(args.dir)
 	rows, images, masks, x = load_examples(used, candidates, args.frames_root, args.dir / "masks.npz")
-	y = np.array([row["label"] == "plant" for row in rows])
+	y = np.array([row["label"] == PlantLabel.PLANT for row in rows])
 	p, accuracy = cross_validate(rows, x, y)
 	save_filter(x, y, accuracy, args.out)
 

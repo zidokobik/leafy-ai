@@ -24,7 +24,7 @@ WEIGHTS_URL = "https://raw.githubusercontent.com/ChaoningZhang/MobileSAM/master/
 WEIGHTS_SHA256 = "6dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f"
 PAD_LABEL = -1  # SAM ignores points with this label; used to give every prompt the same length
 # Prompts sent to the mask decoder at once. Its output is 3 full-size float masks per prompt (~5 MB each),
-# so 290 prompts at once (camera 1's zone grid) used 6 GB and was killed (7 Oct); 32 keeps it under 0.6 GB.
+# so 290 prompts at once (camera 1's zone grid) used 6 GB and was killed; 32 keeps it under 0.6 GB.
 PROMPT_BATCH = 32
 
 

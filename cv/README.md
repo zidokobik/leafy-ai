@@ -94,8 +94,8 @@ the overlay marks them with a red ring and "x". Nothing needs to be set by hand.
 Hole IDs are `L{level}-C{camera}-R{row}-H{position}`, rows numbered by distance from the camera (row 1 = farthest),
 positions from the left.
 
-**Channels.** Crowding is measured in both directions (corrected 12 Oct; the 7 Oct version measured only across
-channels, from a misunderstanding): channel expansion separates the plants *in the same channel*, and plants
+**Channels.** Crowding is measured in both directions: channel expansion separates the plants *in the same
+channel*, and plants
 touching the next channel also need space before they go to Level 2. A map's `channel_axis` says which holes share
 a channel: `"row"` (the default; cameras 1 and 2 see the channels run left-right) or `"col"` (camera 3 looks
 along them). New maps: `click_holes.py --channel-axis col`; existing maps keep theirs. Each hole is paired with
@@ -138,8 +138,9 @@ uv run python tools/run.py --hole-map hole_maps/level1_camera1_P3.json hole_maps
 ```
 
 New frames: rebuild the frame index (step 1) first. `run.py` refuses a map that is still open when frames on
-disk are newer than the index, and reports a layout change that has no hole map yet; either ends the run with a
-PROBLEMS list and exit code 1, so out-of-date statuses can't pass silently.
+disk are newer than the index, refuses a map that fails its row or zone checks (as `check_hole_map.py` reports them),
+and reports a layout change that has no hole map yet; any of these ends the run with a PROBLEMS list and exit code 1, so
+out-of-date or wrong statuses can't pass silently.
 
 For every usable frame of the map's period (from `data/frame_index.csv`), MobileSAM outlines the plant at each
 hole; the plant filter keeps, per hole, the largest outline that is plant and not far bigger than the cell.

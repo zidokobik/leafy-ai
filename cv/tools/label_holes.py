@@ -1,5 +1,5 @@
 """Label hole crops: do this plant's leaves touch the leaves of ANY neighbouring plant, in the same channel
-or in the next channel? (12 Oct: both directions; the 7 Oct question asked about the next channel only.)
+or in the next channel?
 
 Usage (from the cv/ folder, after tools/make_hole_items.py):
 	uv run python tools/label_holes.py --frames-root E:\\Claude
@@ -54,7 +54,7 @@ def render(image: np.ndarray, hole_map: HoleMap, cells: Cells, hole_index: int, 
 	height, width = image.shape[:2]
 	hole = hole_map.holes[hole_index]
 	region = cells.cell(hole_index) | cells.corridors[hole_index]
-	partners = [hole_map.holes[j] for j in cells.partners(hole_index)]  # both directions (12 Oct)
+	partners = [hole_map.holes[j] for j in cells.partners(hole_index)]  # both directions
 	for j in cells.partners(hole_index):
 		region |= cells.cell(j)
 	ys, xs = np.nonzero(region)
@@ -66,8 +66,8 @@ def render(image: np.ndarray, hole_map: HoleMap, cells: Cells, hole_index: int, 
 	size = (int((x1 - x0) * scale), int((y1 - y0) * scale))
 	left = cv2.resize(image[y0:y1, x0:x1], size, interpolation=cv2.INTER_LINEAR)
 	right = left.copy()
-	# dots drawn after resizing, so they stay the same size however wide the close-up is (12 Oct: with partners
-	# in both directions the close-ups got wider and the old 2 px dots shrank to specks)
+	# dots drawn after resizing, so they stay the same size however wide the close-up is (with partners in both
+	# directions the close-ups are wide, and dots drawn before resizing shrink to specks)
 	for point, colour in [(p, (255, 255, 255)) for p in partners] + [(hole, (0, 255, 255))]:
 		at = (round((point.x - x0) * scale), round((point.y - y0) * scale))
 		cv2.circle(left, at, DOT_RADIUS + 1, (0, 0, 0), -1)

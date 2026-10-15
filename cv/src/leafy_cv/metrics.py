@@ -5,16 +5,16 @@ For each hole of the frame's hole map:
    channel as "not this" points) and returns three candidate outlines.
 2. The plant filter scores each candidate. We keep the **largest candidate the filter calls plant**,
    unless it is far bigger than the hole's cell (`MAX_OUTLINE_VS_CELL`): then a piece of canopy or
-   board was outlined, and we keep the smallest plant candidate instead and flag it. (5 Oct: the
-   top-rated outline took in some board for 15% of hole prompts; for most of those, another of the
-   three was plain plant.)
+   board was outlined, and we keep the smallest plant candidate instead and flag it. (The top-rated
+   outline took in some board for 15% of hole prompts; for most of those, another of the three was
+   plain plant.)
 3. **Plant pixels** = the union of the kept outlines of all holes. Leaves of a neighbour that hang over
    a cell count for that cell too: that is real crowding.
 
 Numbers per hole:
 - `coverage`: share of the hole's cell covered by plant pixels.
 - `boundary_contact`: do the leaves meet the leaves of a neighbouring plant, in the same channel or in the
-  next channel (both directions since 12 Oct; pairs in hole_map.py)? Along each of the `GAP_LINES` lines
+  next channel (pairs in hole_map.py)? Along each of the `GAP_LINES` lines
   from this plant's centre to a partner's, the line is *closed* when plant pixels run continuously from one
   plant to the other: no stretch of non-plant (visible board) of `MIN_BOARD_RUN_FACTOR` x their distance or
   more. Per partner: closed lines / lines; the hole's contact is its highest over all its partners (one
@@ -22,7 +22,7 @@ Numbers per hole:
   across the whole corridor.
   Why lines and not "how much of the gap is covered": in the oblique views, tall near plants are drawn over
   the gap behind them, so the middle of the gap looks covered while board is still visible between the
-  plants (7 Oct, camera 2, 22 Sep: open near-row gaps read 0.27-0.79 "covered" but 0.0-0.2 on lines).
+  plants (camera 2, 22 Sep: open near-row gaps read 0.27-0.79 "covered" but 0.0-0.2 on lines).
 - `plant_area_px`: size of the hole's own kept outline (0 if none).
 
 Per zone: `closure` = share of the zone covered by plant, by point count (the point-intercept method of
@@ -30,7 +30,7 @@ canopy cover): MobileSAM is prompted on a grid of points inside the zone (`ZONE_
 `ZONE_MAX_POINTS`), and a point counts as plant when the filter calls **any** of its 3 candidate outlines
 plant (`point_on_plant`).
 
-Checked 7 Oct on 7 frames (2 per camera + an open-board control), any-outline vs smallest-outline rule:
+Checked on 7 frames (2 per camera + an open-board control), any-outline vs smallest-outline rule:
 camera 2 canopy_far 22 Sep 13:00 0.90 vs 0.85, 30 Sep 10:00 (palest canopy, closed) 1.00 vs 0.68; camera 3
 dense_right 30 Sep 11:00 0.92 vs 0.86, 3 Oct 12:00 0.94 vs 0.93; camera 1 dense_far 30 Sep 11:00 0.79 vs
 0.73, 3 Oct 14:00 0.93 vs 0.88; open-board control (camera 2, 22 Sep, rows 2-3: white board with seedlings)
@@ -39,11 +39,12 @@ are on board, the magenta far board, frame corners and the gaps between camera 1
 point was called plant. Limit: small purple/pink seedlings are sometimes missed (reads slightly low there).
 Images: data/checks/zones/ (yellow = plant only under the any-outline rule).
 
-Rejected (7 Oct): the plant filter's 16 px tiles (camera 2 canopy_far fell from 0.91 to 0.48 between 22 and
+Rejected: the plant filter's 16 px tiles (camera 2 canopy_far fell from 0.91 to 0.48 between 22 and
 30 Sep while the canopy stayed closed: pale leaves); the union of the points' outlines (camera 1 dense_far
 jumped between 0.58 and 0.98 hour to hour: single-leaf outlines leave gaps between leaves); the smallest
 outline's verdict (pale leaves rejected: the closed camera 2 canopy fell to 0.63 by 30 Sep).
-Closure counts every gap, including gaps along a channel that expansion doesn't change (camera 1).
+Closure needs the gaps in both directions closed, while a hole is crowded when either direction touches, so a
+zone can turn ready later than the holes around it (camera 1).
 """
 
 import time

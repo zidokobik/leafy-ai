@@ -1,6 +1,6 @@
 """tools/make_hole_items.py (stratified crops) and tools/evaluate_readiness.py (per camera, per status).
 
-Agreed 11 Oct, before any labels: every camera gets each status, camera 2's first days after the 30 Sep
+Agreed before any labels: every camera gets each status, camera 2's first days after the 30 Sep
 transfer are covered, one crop per hole per day, and the catch rate is weighted back to the population.
 """
 

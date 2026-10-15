@@ -3,8 +3,7 @@
 Usage (from the cv/ folder):
 	uv run python tools/evaluate_readiness.py
 
-Agreed 11 Oct, before any labels existed: the rules and thresholds are frozen
-(metrics-v3, rule-v5 = rule-v4 with contact in both directions, corrected 12 Oct before these labels) and are NOT
+Agreed before any labels existed: the rules and thresholds are frozen (metrics-v3, rule-v5) and are NOT
 changed after seeing these results; anything that looks wrong goes into the
 limitations and future scope. Because nothing is tuned, all labelled crops are scored (the test half is shown too).
 
@@ -33,10 +32,13 @@ from typing import NamedTuple
 import numpy as np
 
 from leafy_cv.csv_files import read_observations, write_csv
+from leafy_cv.labelling import ReadinessLabel
 from leafy_cv.readiness import CANDIDATE, EMPTY, GROWING, READY
 
 STATUSES = (READY, CANDIDATE, GROWING, EMPTY)
 MISSED = (GROWING, EMPTY)  # a crowded plant with these statuses gets no alert
+CROWDED, NOT_CROWDED = ReadinessLabel.CROWDED, ReadinessLabel.NOT_CROWDED
+JUDGED = (CROWDED, NOT_CROWDED)  # answers that say crowded or not; "unsure" and "empty" are counted apart
 BOOTSTRAP = 2000
 THRESHOLDS = np.round(np.arange(0.20, 0.81, 0.05), 2)
 
@@ -71,7 +73,7 @@ def catch_interval(
 	rng = np.random.default_rng(seed)
 	counts = defaultdict(lambda: [0, 0])
 	for row in rows:
-		counts[row["status"]][0] += row["label"] == "crowded"
+		counts[row["status"]][0] += row["label"] == CROWDED
 		counts[row["status"]][1] += 1
 	values = []
 	for _ in range(BOOTSTRAP):
@@ -107,9 +109,9 @@ def camera_report(rows: list[dict], weights: dict[str, float]) -> CameraReport:
 	status = {}
 	for name in STATUSES:
 		part = [r for r in rows if r["status"] == name]
-		k = sum(r["label"] == "crowded" for r in part)
+		k = sum(r["label"] == CROWDED for r in part)
 		status[name] = StatusShare(k, len(part), *wilson(k, len(part)))
-	crowded = Counter(r["status"] for r in rows if r["label"] == "crowded")
+	crowded = Counter(r["status"] for r in rows if r["label"] == CROWDED)
 	return CameraReport(
 		status=status,
 		caught=crowded[READY],
@@ -125,10 +127,10 @@ def print_report(title: str, rows: list[dict], weights: dict[tuple[str, str], fl
 	print(f"\n=== {title} ===")
 	for camera in sorted({r["camera_id"] for r in rows}):
 		part = [r for r in rows if r["camera_id"] == camera]
-		judged = [r for r in part if r["label"] in ("crowded", "not_crowded")]
+		judged = [r for r in part if r["label"] in JUDGED]
 		w = {s: weights.get((camera, s), 1.0) for s in STATUSES}
 		report = camera_report(judged, w)
-		extra = Counter(r["label"] for r in part if r["label"] not in ("crowded", "not_crowded"))
+		extra = Counter(r["label"] for r in part if r["label"] not in JUDGED)
 		print(f"{camera}: {len(judged)} judged crops (also: {dict(extra) or 'none'})")
 		for status, (k, n, lo, hi) in report.status.items():
 			if n:
@@ -160,7 +162,7 @@ def labelled_rows(labels_dir: Path, runs_dir: Path) -> list[dict]:
 	if not labels:
 		raise SystemExit(f"No labels yet in {labels_dir / 'labels.csv'}: run tools/label_holes.py first")
 	unknown = [row["item_id"] for row in labels if row["item_id"] not in items]
-	if unknown:  # answers to another crop set (e.g. the 7 Oct question) must never be scored against this one
+	if unknown:  # answers to another crop set (e.g. an older question) must never be scored against this one
 		raise SystemExit(f"{len(unknown)} labels are for items not in items.csv (another crop set?), e.g. {unknown[0]}")
 	observations = {(r["camera_id"], r["period"], r["image_id"], r["hole_id"]): r for r in read_observations(runs_dir)}
 	rows = []
@@ -187,8 +189,8 @@ def print_empty(rows: list[dict]) -> None:
 	for camera in sorted({r["camera_id"] for r in rows}):
 		part = [r for r in rows if r["camera_id"] == camera]
 		cv_empty = [r for r in part if r["status"] == EMPTY]
-		said_empty = [r for r in part if r["label"] == "empty"]
-		human_empty_of_cv = sum(r["label"] == "empty" for r in cv_empty)
+		said_empty = [r for r in part if r["label"] == ReadinessLabel.EMPTY]
+		human_empty_of_cv = sum(r["label"] == ReadinessLabel.EMPTY for r in cv_empty)
 		cv_empty_of_human = sum(r["status"] == EMPTY for r in said_empty)
 		print(
 			f"{camera}: CV empty {len(cv_empty)}, of which human 'empty' {human_empty_of_cv}; "
@@ -198,9 +200,9 @@ def print_empty(rows: list[dict]) -> None:
 
 def print_threshold_finding(rows: list[dict]) -> None:
 	"""Finding only, never applied: agreement with the labels at other raw contact thresholds (dev days)."""
-	dev = [r for r in rows if r["split"] == "dev" and r["label"] in ("crowded", "not_crowded")]
+	dev = [r for r in rows if r["split"] == "dev" and r["label"] in JUDGED]
 	if dev:
-		truth = np.array([r["label"] == "crowded" for r in dev])
+		truth = np.array([r["label"] == CROWDED for r in dev])
 		contact = np.array([float(r["boundary_contact"] or "nan") for r in dev])
 		print("\nFinding only (not applied): raw contact threshold on dev days -> agreement with labels")
 		for threshold in THRESHOLDS:

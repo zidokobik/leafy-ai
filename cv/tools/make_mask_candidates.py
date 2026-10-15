@@ -4,9 +4,9 @@ Usage (from the cv/ folder, after tools/download_weights.py):
 	uv run python tools/make_mask_candidates.py --frames-root E:\\Claude
 
 Picks a spread of midday frames from every camera (all dates, all lighting), then runs MobileSAM:
-- frames covered by a hole map: one prompt per hole centre, with the touching holes as "not this" points: the
-  pipeline's prompts when the candidates were made (4 Oct). Since 7 Oct the pipeline also marks the holes it faces in
-  the next channel, so today's outlines are close to these, not identical (a known limitation; retraining would fix it).
+- frames covered by a hole map: one prompt per hole centre, with the touching holes as "not this" points. The
+  pipeline also marks the holes each hole faces in the next channel, so its outlines are close to these, not
+  identical (a known limitation; retraining would fix it).
 - other frames: prompts at random points, which gives a varied mix of plant, board,
   pots, walls and glare.
 
@@ -51,7 +51,7 @@ def pick_frames(index_csv: Path, frames_per_camera: int, also: tuple[str, ...] =
 	picks = []
 	for rows in by_camera.values():
 		dates = sorted({r["when"].date() for r in rows})
-		chosen = sorted({int(round(i)) for i in np.linspace(0, len(dates) - 1, min(frames_per_camera, len(dates)))})
+		chosen = sorted({round(i) for i in np.linspace(0, len(dates) - 1, min(frames_per_camera, len(dates)))})
 		for i in chosen:
 			day = [r for r in rows if r["when"].date() == dates[i]]
 			picks.append(min(day, key=lambda r: abs(r["when"].hour + r["when"].minute / 60 - TARGET_HOUR)))

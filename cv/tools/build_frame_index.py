@@ -12,7 +12,7 @@ Uses config/fixed_parts.json (where each camera's fixed parts are) and
 trained/plant_filter.json (to see where the plants are). About 1 s per frame.
 
 Refuses to replace an existing frame_index.csv / periods.csv unless --overwrite is given: the current ones were
-corrected by hand on 11 Oct (the tool can't recreate those corrections). Back them up first.
+corrected by hand (the tool can't recreate those corrections). Back them up first.
 """
 
 import argparse

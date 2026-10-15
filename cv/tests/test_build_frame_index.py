@@ -1,4 +1,4 @@
-"""tools/build_frame_index.py must not overwrite the frame index by accident (it was corrected by hand on 11 Oct)."""
+"""tools/build_frame_index.py must not overwrite the frame index by accident (it was corrected by hand)."""
 
 import importlib.util
 import sys

@@ -111,8 +111,8 @@ def test_measure_frame_coverage_and_contact():
 
 
 def test_contact_counts_plants_touching_in_the_same_channel():
-	# 12 Oct correction: R01-H01 (60, 70) and R01-H02 (100, 70) touch along their channel, with board between
-	# them and row 2 (y = 120). Expansion separates them, so the hole is crowded (contact 1), not open (old: 0).
+	# R01-H01 (60, 70) and R01-H02 (100, 70) touch along their channel, with board between them and row 2
+	# (y = 120). Expansion separates them, so the hole is crowded (contact 1), not open (0 with next-channel-only).
 	hole_map = two_channel_map()
 	cells = build_cells(hole_map)
 	plant = np.zeros((SIZE, SIZE), bool)
@@ -174,7 +174,7 @@ def test_zone_closure_is_the_share_of_grid_points_on_plant():
 
 
 def test_a_point_is_plant_if_any_of_its_outlines_is():
-	# 7 Oct: on the palest canopy the smallest outline (one pale leaf) was rejected while a bigger one was plant
+	# on the palest canopy the smallest outline (one pale leaf) is rejected while a bigger one is plant
 	from leafy_cv.metrics import point_on_plant
 	from leafy_cv.plant_filter import ImageLayers
 

@@ -121,7 +121,7 @@ def test_clear_move_needs_many_fixed_part_matches_and_a_real_shift():
 
 
 def test_map_frames_keeps_the_maps_own_period(tmp_path):
-	# check_hole_map used to take every usable frame in the map's dates, incl. a later layout's (12 Oct)
+	# a map's frames are its own period's, not every usable frame in its dates (a later layout's would be included)
 	rows = [
 		("f3", "2026-10-02T10:00:00", "P2", "True"),
 		("f1", "2026-10-01T10:00:00", "P2", "True"),

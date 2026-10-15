@@ -162,7 +162,7 @@ class HoleClicker:
 		x, y = min(max(mx / self.scale, 0.0), width), min(max(my / self.scale, 0.0), height)
 		if self.drawing is not None:
 			if event == cv2.EVENT_LBUTTONDOWN:
-				self.drawing.append((int(round(x)), int(round(y))))
+				self.drawing.append((round(x), round(y)))
 			elif event == cv2.EVENT_RBUTTONDOWN and self.drawing:
 				self.drawing.pop()
 		elif event == cv2.EVENT_LBUTTONDOWN:
@@ -175,7 +175,7 @@ class HoleClicker:
 
 	def delete_nearest(self, x: float, y: float) -> None:
 		"""Delete the hole nearest (x, y) within DELETE_RADIUS_PX and switch to its row, so the replacement click
-		lands in the same row (7 Oct: re-placed dots all went into row 1 because the tool stayed on its row)."""
+		lands in the same row (otherwise re-placed dots all go into the row the tool is on)."""
 		best = None
 		for r, row in enumerate(self.rows):
 			for k, (hx, hy, _) in enumerate(row):
@@ -227,8 +227,7 @@ class HoleClicker:
 	def undo(self) -> str:
 		"""Undo the newest hole added this session: one press per added hole, newest first. If that hole was already
 		deleted with a right click, nothing else is removed (press u again for the one before), and holes loaded from
-		the map are never undone (before 13 Oct, undo removed the last hole of the row, which after a right-click
-		delete could be one of the map's own holes)."""
+		the map are never undone."""
 		if self.history:
 			row, point = self.history.pop()
 			for k in range(len(self.rows[row]) - 1, -1, -1):
@@ -290,7 +289,7 @@ class HoleClicker:
 		for r, row in enumerate(self.rows):
 			colour = ROW_PALETTE[r % len(ROW_PALETTE)]
 			for k, (x, y, estimated) in enumerate(sorted(row, key=lambda p: p[0]), start=1):
-				centre = (int(round(x)), int(round(y)))
+				centre = (round(x), round(y))
 				cv2.circle(canvas, centre, 6, (0, 0, 0), -1)
 				cv2.circle(canvas, centre, 5, (0, 140, 255) if estimated else colour, -1)
 				if r == self.row and self.drawing is None:

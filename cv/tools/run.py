@@ -17,8 +17,8 @@ For each map it writes data/runs/<camera>_<period>/:
 Frames come from data/frame_index.csv: usable, in the map's valid_from..valid_to, and in the map's
 period. About 15-20 s per frame on a laptop CPU (MobileSAM encoder + one prompt per hole + zone grid).
 
-Steps per map (run_map): check the layout -> pick the frames -> measure the frames not measured yet -> contact per
-pair of plants from the saved plant pixels -> statuses and observation rows -> overlays, timeline, summary.
+Steps per map (run_map): check the map and the layout -> pick the frames -> measure the frames not measured yet ->
+contact per pair of plants from the saved plant pixels -> statuses and observation rows -> overlays, timeline, summary.
 """
 
 import argparse
@@ -43,7 +43,17 @@ from leafy_cv.csv_files import format_optional, write_csv
 from leafy_cv.drawing import FONT, draw_plant_outline, put_outlined_text
 from leafy_cv.frame_index import IndexRow, map_frames, read_frame_index
 from leafy_cv.frames import parse_frame_path, read_image
-from leafy_cv.hole_map import ACROSS, ALONG, Cells, HoleMap, build_cells, camera_number, zone_mask
+from leafy_cv.hole_map import (
+	ACROSS,
+	ALONG,
+	Cells,
+	HoleMap,
+	build_cells,
+	camera_number,
+	row_problems,
+	zone_mask,
+	zone_problems,
+)
 from leafy_cv.metrics import FrameMeasure, hole_contact, measure_frame, pair_contact
 from leafy_cv.plant_filter import DEFAULT_PLANT_FILTER, PlantFilter, pack_masks, unpack_masks
 from leafy_cv.readiness import (
@@ -63,7 +73,7 @@ from leafy_cv.readiness import (
 if TYPE_CHECKING:
 	from leafy_cv.segment import Segmenter
 
-METRICS_VERSION = "metrics-v3"  # v2 (7 Oct): zone closure by point count; v3: a point is plant if any outline is
+METRICS_VERSION = "metrics-v3"  # v2: zone closure by point count; v3: a point is plant if any outline is
 STATUS_COLOURS = {  # BGR
 	EMPTY: (150, 150, 150),
 	GROWING: (80, 190, 80),
@@ -175,7 +185,7 @@ def layout_problems(index_csv: Path, frames_root: Path, hole_map: HoleMap, maps_
 		(tools/build_frame_index.py). A closed map can't get new frames, so it still runs.
 	- A later period (new layout or camera move found by the index) with no hole map: its frames are
 		never measured with the old map (pick_frames keeps the map's own period), but the newest statuses
-		then stop at the change, so it is reported. 8 Oct: the guard before the frames after 3 Oct arrive.
+		then stop at the change, so it is reported.
 	"""
 	rows = read_frame_index(index_csv, hole_map.camera_id)
 	problems: list[str] = []
@@ -209,6 +219,16 @@ def layout_problems(index_csv: Path, frames_root: Path, hole_map: HoleMap, maps_
 				f"not measured; click a map (tools/click_holes.py) before trusting the newest statuses."
 			)
 	return problems, refuse
+
+
+def map_problems(hole_map: HoleMap) -> list[str]:
+	"""The map's own row and zone checks (as in tools/check_hole_map.py). A map that fails them is not measured: a
+	hole clicked twice would get a cell of area 0 and gap lines of length 0, and nothing would say so."""
+	return [
+		f"{hole_map.camera_id}_{hole_map.period}: {problem}. Fix the map (tools/click_holes.py), check it "
+		f"(tools/check_hole_map.py). Not run."
+		for problem in row_problems(hole_map) + zone_problems(hole_map)
+	]
 
 
 # --- step 2: which frames
@@ -327,7 +347,7 @@ def measure_missing(
 	cache_path = run.out_dir / "measurements.csv"
 	cache = load_cache(cache_path, run.measured_with, run.map_hash)
 	# a frame is measured again unless its numbers AND its saved plant pixels were made with these settings
-	# (8 Oct review: an interrupted run with other settings could leave its pixels under the old numbers)
+	# (otherwise an interrupted run with other settings could leave its pixels under the old numbers)
 	todo = [
 		f
 		for f in frames
@@ -343,8 +363,8 @@ def measure_missing(
 		cache[frame.file] = measurement_rows(run, frame, measure)
 		save_plant_pixels(run.pixels_path(frame.file), measure.plant_mask, run.pixels_made_with)
 		print(f"  [{n}/{len(todo)}] {frame.file}  {measure.runtime_ms / 1000:.1f} s", flush=True)
-		# write the cache as we go, so an interrupted run keeps what it measured
-		if n % 10 == 0 or n == len(todo):
+		# write the cache as we go, so an interrupted run keeps what it measured (and once more below, at the end)
+		if n % 10 == 0:
 			write_csv(cache_path, MEASUREMENT_FIELDS, cache_rows(cache), extrasaction="ignore")
 	write_csv(cache_path, MEASUREMENT_FIELDS, cache_rows(cache), extrasaction="ignore")
 	return cache
@@ -608,7 +628,7 @@ def daily_picks(frames: list[IndexRow]) -> list[IndexRow]:
 	return sorted(picks.values(), key=lambda f: f.captured_at)
 
 
-def summarise(name: str, frames: list[IndexRow], observations: list[dict], cache: dict[str, list[Row]]) -> None:
+def summarise(frames: list[IndexRow], observations: list[dict], cache: dict[str, list[Row]]) -> None:
 	last = frames[-1].file
 	counts = Counter(r["status"] for r in observations if r["image_id"] == last and r["kind"] == "hole")
 	print(f"  last frame {last}: " + ", ".join(f"{k} {v}" for k, v in counts.most_common()))
@@ -646,9 +666,11 @@ def run_map(
 	"""Measure (or reuse) every usable frame of the map's period and write the outputs; returns problems."""
 	hole_map = HoleMap.load(map_path)
 	problems, refuse = layout_problems(args.index_csv, args.frames_root, hole_map, map_path.parent)
+	bad_map = map_problems(hole_map)
+	problems += bad_map
 	for problem in problems:
 		print(f"  PROBLEM: {problem}")
-	if refuse:
+	if refuse or bad_map:
 		return problems
 	cells = build_cells(hole_map)
 	run = MapRun(
@@ -672,7 +694,7 @@ def run_map(
 	if args.overlays != "none":
 		write_overlays(args, run, frames, observations, gap_contact)
 	write_timeline(run, frames, observations)
-	summarise(run.name, frames, observations, cache)
+	summarise(frames, observations, cache)
 	return problems
 
 

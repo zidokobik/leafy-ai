@@ -41,7 +41,7 @@ def test_closed_period_keeps_its_end(click_holes, tmp_path):
 
 
 def test_latest_period_stays_open(click_holes, tmp_path):
-	# 7 Oct: saving a current-layout map wrote the last frame seen as its end, so newer frames were left out
+	# a current-layout map must not get the last frame seen as its end, or newer frames are left out
 	write_periods(tmp_path / "periods.csv")
 	assert click_holes.period_dates(tmp_path / "periods.csv", "level1_camera2", "P3") == ("2026-09-30T11:00:24", None)
 	assert click_holes.period_dates(tmp_path / "periods.csv", "level1_camera3", "P4")[1] is None
@@ -86,7 +86,7 @@ def test_undo_removes_the_last_added_hole(click_holes, tmp_path):
 
 
 def test_undo_never_removes_a_hole_loaded_from_the_map(click_holes, tmp_path):
-	# 13 Oct: add a hole, right-click it away, press u: the old tool then deleted one of the map's own holes
+	# add a hole, right-click it away, press u: undo must not delete one of the map's own holes
 	c = clicker(click_holes, tmp_path)
 	c.load(HoleMap("level1_camera2", 1, "P2", "x", None, (400, 300), "f.jpg", [Hole("L1-C2-R01-H01", 10, 10, 1, 1)]))
 	click(c, 300, 200)

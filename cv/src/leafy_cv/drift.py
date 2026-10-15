@@ -30,12 +30,12 @@ MAX_FEATURES = 2000
 MAX_MATCHES = 400
 RANSAC_THRESHOLD_PX = 2.5
 FAST_THRESHOLD = 7  # lower than ORB's default 20: the fixed parts are small, so take fainter corners too
-# From the 30 Sep audit: normal consecutive frames move under 1 px; camera 1's first frame of
+# Measured on the archived frames: normal consecutive frames move under 1 px; camera 1's first frame of
 # the day moves ~8 px; a real bump (camera 3, 18 Sep) moved 22 px with 333 inliers on fixed parts.
 MIN_INLIERS = 15
 MAX_STABLE_SHIFT_PX = 5.0
 MIN_INLIERS_TO_CALL_A_MOVE = 50
-# From all 684 frames (5 Oct), plant change with a one-tile tolerance (scene.plant_change):
+# From all 684 archived frames, plant change with a one-tile tolerance (scene.plant_change):
 # the 7 real layout events 0.060-0.479; normal hours at most 0.034; overnight at most 0.028.
 # The limit sits midway between normal and the weakest event (camera 1, 30 Sep 11:00, where
 # plants were swapped for other plants in similar places). The margin is real but not wide.
