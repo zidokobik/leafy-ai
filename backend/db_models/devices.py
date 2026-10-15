@@ -1,21 +1,28 @@
 import uuid
-from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from sqlmodel import Field, SQLModel
 
 
-class Device(SQLModel, table=True):
-	__tablename__ = "devices"
+class Powerboard(SQLModel, table=True):
+	"""A Kasa power strip on the farm network, reached by IP address or hostname."""
 
-	device_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-	device_name: str | None = None
-	device_category: str | None = None
-	device_type: str | None = None
-	level_id: uuid.UUID | None = None
-	measurement_unit: str | None = Field(default=None, sa_type=sa.Text)
-	status: str | None = None
-	created_at: datetime = Field(
-		default_factory=lambda: datetime.now(UTC),
-		sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-	)
+	__tablename__ = "powerboards"
+
+	id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+	name: str
+	host: str = Field(unique=True)
+
+
+class Device(SQLModel, table=True):
+	"""Equipment plugged into one outlet of a powerboard; outlet_num is 1-based."""
+
+	__tablename__ = "devices"
+	__table_args__ = (sa.UniqueConstraint("powerboard_id", "outlet_num", name="devices_powerboard_outlet_unique"),)
+
+	id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+	name: str
+	# fan | light | irrigation_pump | ec_doser | ph_doser (see backend/schemas/devices.py).
+	device_type: str
+	powerboard_id: uuid.UUID = Field(foreign_key="powerboards.id")
+	outlet_num: int

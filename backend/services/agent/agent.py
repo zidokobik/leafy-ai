@@ -11,7 +11,7 @@ from backend.schemas.chat import AnswerDetail
 from backend.services import chat_history
 from backend.settings import get_settings
 
-from .agent_tools import alerts, camera, email, harvest_readiness, miscelaneous, plant_readiness, proposals, sensors
+from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors, harvest_readiness,plant_readiness, proposals,
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
@@ -24,12 +24,7 @@ def get_provider() -> ai.Provider:
 	return ai.get_provider("vercel", api_key=settings.AI_GATEWAY_API_KEY.get_secret_value())
 
 
-def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = None) -> ai.Agent:
-	proposal_tool = (
-		proposals.scheduled_proposal_tool(schedule_id)
-		if schedule_id is not None
-		else proposals.propose_device_operation
-	)
+def build_agent(*, schedule_id: UUID | None = None) -> ai.Agent:
 	return ai.Agent(
 		tools=[
 			miscelaneous.get_unix_timestamp,
@@ -43,7 +38,9 @@ def build_agent(*, allow_proposals: bool = False, schedule_id: UUID | None = Non
 			alerts.update_alert_tool(schedule_id),
 			alerts.resolve_alert,
 			email.send_email_tool(schedule_id),
-			*([proposals.get_operation_devices, proposal_tool] if allow_proposals else []),
+			devices.list_devices,
+			devices.list_device_proposals,
+			devices.propose_device_run_tool(schedule_id),
 		]
 	)
 
@@ -70,7 +67,7 @@ async def stream_chat_response(
 
 	provider = get_provider()
 	model = ai.Model(id=settings.AI_MODEL, provider=provider)
-	agent = build_agent(allow_proposals=True)
+	agent = build_agent()
 
 	async with agent.run(model, messages) as stream:
 		ai.ui.ai_sdk.apply_approvals(approvals)

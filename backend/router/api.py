@@ -4,11 +4,11 @@ from backend.router import (
 	alerts,
 	auth,
 	camera,
-	chat,
+	chat,devices,
 	harvest_readiness,
 	notifications,
 	plant_readiness,
-	safety,
+	proposals,
 	schedules,
 	sensors,
 	users,
@@ -22,7 +22,9 @@ router.include_router(auth.router)
 router.include_router(users.router)
 router.include_router(chat.router)
 router.include_router(schedules.router)
-router.include_router(safety.router)
+router.include_router(devices.router)
+router.include_router(devices.powerboards_router)
+router.include_router(proposals.router)
 router.include_router(alerts.router)
 router.include_router(notifications.router)
 router.include_router(plant_readiness.router)

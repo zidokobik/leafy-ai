@@ -22,15 +22,13 @@ Your task is to:
 * Follow the scheduled instruction provided for this run.
 * Use available tools to achieve the scheduled task effectively.
 * Do not ask the user follow-up questions unless the task cannot reasonably be completed without missing information.
-* Never guess device identity, measurements or safe operating limits. If information is missing, report it and do not propose an operation.
+* Never guess device identity, measurements or run times. If information is missing, report it and do not propose a device run.
 * Avoid conversational filler.
 * Return only the useful result of this scheduled execution.
 * If there is nothing meaningful to report or no action is required, return a concise indication of that.
 * Do not assume a human is actively present during this run.
 * Treat this execution as a single independent run unless prior context or memory is explicitly provided.
-* Use propose_scheduled_operation instead of the chat proposal tool. Schedule identity is bound by the server.
-* Submit at most one proposal per device this run. Never retry failed proposals automatically.
-* Every proposal requires human approval in Logs. Scheduling is not approval and does not execute hardware.
+* Device runs only happen after a person approves them, and nobody may be watching this run. Propose a run (propose_device_run) only if it is still worthwhile when approved up to 30 minutes from now, and say so in your result. Call list_devices and list_device_proposals first: never re-propose a run that is pending or running, or one a person recently rejected unless conditions have materially worsened. Never retry a failed proposal automatically.
 * Before raising an alert, call list_alerts and reuse the exact alert_key of any existing active alert for the same condition so repeated runs update it instead of stacking duplicates. Use update_alert to refine or re-grade an existing alert without recording a new occurrence. Resolve alerts whose condition has verifiably cleared.
 * Use send_email when this run newly raised a critical condition (raise_alert returned created=true) or newly escalated one to critical, and when the scheduled instruction explicitly asks for an emailed report. Never re-email a condition on a routine re-raise; admins were already notified.
 """
@@ -46,7 +44,7 @@ async def execute_agent_scheduled_job(job: AgentScheduledJob):
 	settings = get_settings()
 
 	provider = get_provider()
-	agent = build_agent(allow_proposals=True, schedule_id=job.id)
+	agent = build_agent(schedule_id=job.id)
 	model = ai.Model(id=settings.AI_MODEL, provider=provider)
 
 	messages = [
@@ -60,7 +58,7 @@ async def execute_agent_scheduled_job(job: AgentScheduledJob):
 			async for _event in stream:
 				pass
 	except Exception:
-		logger.exception("Scheduled agent run failed: %s; inspect Logs before retrying", job.id)
+		logger.exception("Scheduled agent run failed: %s", job.id)
 		raise
 
 	try:
@@ -76,4 +74,4 @@ async def execute_agent_scheduled_job(job: AgentScheduledJob):
 		logger.info("Scheduled agent run stored as conversation %s", conversation.id)
 	except Exception:
 		logger.exception("Failed to persist conversation for scheduled run %s", job.id)
-	logger.info("Scheduled agent run finished: %s; this does not indicate hardware execution", job.id)
+	logger.info("Scheduled agent run finished: %s", job.id)

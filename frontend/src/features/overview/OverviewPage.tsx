@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { AgentChatSheet } from '../agents/AgentChatSheet'
 import { ActiveAlerts } from '../alerts/ActiveAlerts'
+import { OpenProposals } from '../proposals/OpenProposals'
 import { CameraGrid } from './CameraGrid'
 import { SensorChart } from './SensorChart'
 import { sensorMetrics } from './sensorMetrics'
@@ -46,6 +47,7 @@ export function OverviewPage() {
   return (
     <section className="flex flex-col gap-5">
       <ActiveAlerts />
+      <OpenProposals />
       <AgentChatSheet />
       <CameraGrid />
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

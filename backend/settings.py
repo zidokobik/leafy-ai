@@ -44,6 +44,10 @@ class Settings(BaseSettings):
 	CV_RUNS_DIR: str = "cv/data/runs"
 	# Clock of the camera frame names and Level 2 move/harvest times (not confirmed; La Trobe, Melbourne).
 	FARM_TIMEZONE: str = "Australia/Melbourne"
+	# TP-Link account login, only needed for powerboards whose firmware requires authentication
+	# (newer Kasa firmware and Tapo strips). Older Kasa power strips work without it.
+	KASA_USERNAME: str | None = None
+	KASA_PASSWORD: SecretStr | None = None
 
 	model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

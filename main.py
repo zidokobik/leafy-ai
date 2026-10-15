@@ -10,6 +10,7 @@ from starlette.types import Scope
 import backend.router.api
 import backend.settings
 from backend.schedule import run_scheduler
+from backend.services import proposals
 
 settings = backend.settings.get_settings()
 
@@ -20,7 +21,11 @@ async def lifespan(app: FastAPI):
 	logging.basicConfig(level=logging.INFO)
 
 	async with run_scheduler():
-		yield
+		await proposals.resume_auto_off()
+		try:
+			yield
+		finally:
+			proposals.cancel_auto_off_timers()
 
 
 app = FastAPI(lifespan=lifespan)
