@@ -11,7 +11,7 @@ from backend.schemas.chat import AnswerDetail
 from backend.services import chat_history
 from backend.settings import get_settings
 
-from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors, harvest_readiness,plant_readiness, proposals,
+from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors, harvest_readiness,plant_readiness, proposals
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
