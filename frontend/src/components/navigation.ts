@@ -1,5 +1,4 @@
-import { BellRingIcon, BotIcon, CalendarDaysIcon, LayoutDashboardIcon, SproutIcon, Logs, ShieldCheckIcon, ScanEyeIcon } from 'lucide-react'
-import { BellRingIcon, BotIcon, CalendarDaysIcon, LayoutDashboardIcon, SproutIcon, Logs } from 'lucide-react'
+import { BellRingIcon, BotIcon, CalendarDaysIcon, LayoutDashboardIcon, SproutIcon, Logs, ScanEyeIcon } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavItem = {

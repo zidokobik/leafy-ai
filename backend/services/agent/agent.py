@@ -11,7 +11,7 @@ from backend.schemas.chat import AnswerDetail
 from backend.services import chat_history
 from backend.settings import get_settings
 
-from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors, harvest_readiness,plant_readiness, proposals
+from .agent_tools import alerts, camera, devices, email, miscelaneous, sensors, harvest_readiness,plant_readiness
 
 with open("system_prompt.md") as f:
 	SYSTEM_PROMPT = f.read().strip()
@@ -39,7 +39,6 @@ def build_agent(*, schedule_id: UUID | None = None) -> ai.Agent:
 			alerts.resolve_alert,
 			email.send_email_tool(schedule_id),
 			devices.list_devices,
-			devices.list_device_proposals,
 			devices.propose_device_run_tool(schedule_id),
 		]
 	)
